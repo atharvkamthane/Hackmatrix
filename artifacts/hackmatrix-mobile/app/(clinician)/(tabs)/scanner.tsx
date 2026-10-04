@@ -1,0 +1,1 @@
+export { ClinicianScannerScreen as default } from '@/src/screens/clinician';

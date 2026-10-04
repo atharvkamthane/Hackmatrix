@@ -1,0 +1,1 @@
+export { ClinicianWaitingScreen as default } from '@/src/screens/clinician';

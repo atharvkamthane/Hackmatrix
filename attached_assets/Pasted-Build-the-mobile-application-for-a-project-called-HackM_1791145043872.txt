@@ -1,0 +1,342 @@
+Build the mobile application for a project called "HackMatrix".
+
+IMPORTANT:
+This is the MOBILE FRONTEND ONLY.
+
+Do NOT build or introduce a backend, database, authentication provider, Supabase, Firebase, Appwrite, or any other backend service. The real backend will be built separately by our team using Node.js + Express + TypeScript + MongoDB Atlas + Clerk.
+
+The mobile app will eventually communicate with our own REST API and Socket.IO backend. For now, use clean mock/local data and clearly separated API/service interfaces so the backend can be connected later without redesigning the UI.
+
+TECHNOLOGY
+- React Native
+- Expo
+- TypeScript
+- Expo Router if appropriate
+- Use a maintainable component-based architecture
+- Keep dependencies reasonable and compatible with Expo
+- The same application must support two roles: PATIENT and CLINICIAN
+- Role will eventually come from the backend after authentication
+- Do not create separate applications for the two roles
+
+PROJECT CONTEXT
+
+HackMatrix is a role-based digital health platform.
+
+There are two mobile roles:
+
+1. PATIENT
+2. CLINICIAN
+
+There is also an ADMIN role, but ADMIN uses a separate web application and must NOT be implemented in this mobile app.
+
+The mobile app is intended for a healthcare demonstration using synthetic patient data. Do not use real patient information.
+
+PATIENT FEATURES
+
+Build the following patient-facing screens and flows:
+
+1. Login
+   - Clean login screen
+   - Do not implement real authentication yet
+   - Create an authentication/service abstraction that can later connect to Clerk/backend
+   - After mock login, route according to the selected/mock role
+
+2. Patient Home
+   - Clear summary of the patient's health information
+   - Recent encounters
+   - Current conditions
+   - Recent prescriptions
+   - Clear navigation to the major patient features
+
+3. My Health Records
+   - Conditions
+   - Encounters/visit history
+   - Prescriptions
+   - Observations
+   - Use realistic synthetic demo data
+
+4. My QR
+   - Dedicated screen displaying a QR code
+   - The QR represents an opaque temporary token
+   - NEVER put patient name, patient ID, diagnosis, prescription, or any health information inside the QR
+   - For now generate/mock the token locally
+   - Visually communicate that the QR is temporary and intended to be scanned by an authorized clinician
+   - Include an appropriate expiry/countdown presentation if practical
+   - The real backend will later issue and rotate the token
+
+5. Access Requests
+   - Show incoming requests from clinicians
+   - Display:
+     - clinician name
+     - organization
+     - requested access scopes
+     - requested duration
+     - request status
+   - Allow Approve and Deny actions
+   - Approval should open a clear confirmation state
+   - The actual consent operation will later be connected to the backend
+
+6. Active Grants
+   - Show clinicians who currently have access
+   - Show scopes
+   - Show expiry
+   - Provide Revoke Access action
+   - Include an appropriate confirmation interaction
+
+7. Access History
+   - Show sanitized history of who accessed the patient's records and when
+   - Use synthetic data
+
+CLINICIAN FEATURES
+
+1. Clinician Home
+   - Clear professional dashboard
+   - Quick access to:
+     - Scan Patient QR
+     - Recent/authorized patients if appropriate
+     - Recent activity
+   - Do not assume a clinician can freely browse all patients
+
+2. QR Scanner
+   - Build a proper scanner screen using Expo-compatible camera/barcode functionality if feasible
+   - The scanner should eventually submit an opaque token to:
+     POST /api/clinician/qr/resolve
+   - For now use a mock service/interface
+   - Do not implement patient lookup directly from the QR
+   - Scanning the QR must NOT immediately display patient records
+
+3. Waiting for Patient Approval
+   - After a QR scan, show a clear "Waiting for patient approval" state
+   - Display clinician/request information
+   - The real application will receive approval through Socket.IO
+   - For now simulate the state transition with mock data
+   - Design the UI so the mock socket layer can later be replaced by the real Socket.IO client
+
+4. Authorized Patient View
+   - Only show this screen after a mock approved grant
+   - Patient timeline
+   - Conditions
+   - Prescriptions
+   - Encounter history
+   - Clearly communicate that access is authorized and time-limited
+
+5. Create Encounter
+   - Form for:
+     - diagnosis
+     - reason
+     - date
+   - Use validation
+   - Prepare the service layer so it can later call:
+     POST /api/clinician/encounters
+
+6. Create Prescription
+   - Form for:
+     - drug
+     - dose
+     - frequency
+     - start
+     - end
+   - Prepare service abstraction for:
+     POST /api/clinician/prescriptions
+
+7. Add Observation
+   - Prepare a simple observation/report form
+   - This is a lower-priority feature and can be visually implemented but should not dominate development
+
+IMPORTANT SECURITY/ARCHITECTURE RULES
+
+The UI must reflect these rules:
+
+- Patient records are not available to a clinician merely because they scanned a QR.
+- QR scanning creates an access request.
+- Patient approval is required.
+- Clinical records are accessible only when a valid grant exists.
+- Grants can expire or be revoked.
+- The mobile client must never be treated as the authority for authorization.
+- Role information will eventually come from the verified backend session.
+- Do not implement authorization by simply hiding buttons.
+- Do not put sensitive information in QR codes.
+- Do not store secrets in the mobile application.
+- Do not create direct MongoDB/database access from the mobile app.
+- Do not create a separate backend just for this frontend.
+
+API/SOCKET INTERFACES
+
+Create a clean service layer with placeholder/mock implementations so the UI does not directly depend on mock data.
+
+Structure the code approximately around:
+
+src/
+  api/
+  auth/
+  components/
+  hooks/
+  services/
+  socket/
+  types/
+  utils/
+
+Create interfaces/services for concepts such as:
+
+- authentication
+- patient records
+- QR
+- access requests
+- grants
+- clinician patients
+- encounters
+- prescriptions
+- observations
+- Socket.IO events
+
+The eventual backend contract includes:
+
+PATIENT:
+GET /api/patient/me
+GET /api/patient/records
+GET /api/patient/medications
+GET /api/patient/qr
+GET /api/patient/access-requests
+POST /api/patient/access-requests/:id/decision
+GET /api/patient/grants
+POST /api/patient/grants/:id/revoke
+GET /api/patient/access-history
+
+CLINICIAN:
+POST /api/clinician/qr/resolve
+GET /api/clinician/access-requests/:id
+GET /api/clinician/patients/:id/timeline
+GET /api/clinician/patients/:id/prescriptions
+POST /api/clinician/encounters
+POST /api/clinician/prescriptions
+POST /api/clinician/observations
+
+Eventually Socket.IO will be used for:
+
+access:requested
+access:decided
+access:revoked
+
+Design the frontend so these can be connected later without restructuring the screens.
+
+VISUAL DESIGN
+
+You have freedom to decide the visual design.
+
+Keep the overall interface:
+- clean
+- modern
+- professional
+- trustworthy
+- healthcare-oriented
+- easy to understand
+- suitable for a hackathon demonstration
+- consistent across patient and clinician flows
+- responsive to different Android screen sizes
+- accessible with clear typography and spacing
+
+Do NOT make it:
+- cyberpunk
+- neon
+- overly futuristic
+- visually noisy
+- overloaded with gradients
+- unnecessarily animated
+- full of decorative elements
+
+Use your own judgment for:
+- color palette
+- typography
+- cards
+- navigation
+- icons
+- spacing
+- illustrations
+- subtle animations
+
+Prioritize usability over visual effects.
+
+UX REQUIREMENTS
+
+The important workflows should be obvious:
+
+PATIENT:
+Login
+→ Patient Home
+→ My QR
+→ Access Request
+→ Approve/Deny
+→ Active Grants
+→ Revoke
+→ Access History
+
+CLINICIAN:
+Login
+→ Clinician Home
+→ Scan QR
+→ Waiting for Approval
+→ Authorized Patient
+→ Timeline
+→ Create Encounter/Prescription
+
+Use clear loading, empty, error, success, confirmation, and unauthorized/expired states.
+
+Make the application feel like a real production healthcare application rather than a collection of disconnected screens.
+
+MOCK DATA
+
+Use clearly synthetic/demo data.
+
+Examples can include:
+- synthetic patient names
+- synthetic diagnoses
+- synthetic encounters
+- synthetic prescriptions
+- synthetic clinician names
+- synthetic organizations
+
+Do not use real patient information.
+
+DEVELOPMENT PRIORITY
+
+Prioritize in this order:
+
+P0:
+1. Login/role routing
+2. Patient dashboard
+3. Patient records
+4. Patient QR
+5. Clinician QR scanner
+6. Waiting for approval
+7. Patient approval/denial
+8. Authorized clinician patient view
+9. Grant/revocation UI
+
+P1:
+10. Observations
+11. More detailed history
+12. Additional UX polish
+
+Do not spend significant time on P1 features before the P0 workflows are complete.
+
+CODE QUALITY
+
+- TypeScript throughout
+- Avoid unnecessary `any`
+- Reusable components
+- Reusable form components
+- Centralized types
+- Centralized API/service layer
+- Do not hardcode API URLs throughout components
+- Keep mock services replaceable
+- Keep business logic outside presentation components where practical
+- Add comments only where they clarify non-obvious decisions
+- Keep the codebase easy for another developer to take over
+
+MOST IMPORTANT:
+
+Build the mobile frontend as a standalone, polished Expo application whose backend can be replaced later.
+
+Do not make architectural decisions that force us to use Replit's backend, database, authentication, or hosting.
+
+At the end, make sure the project runs successfully with Expo and that all major patient and clinician P0 screens are navigable using mock data.

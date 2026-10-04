@@ -1,0 +1,1 @@
+export { PatientRecordsScreen as default } from '@/src/screens/patient';

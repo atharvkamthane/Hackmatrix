@@ -1,0 +1,1 @@
+- [Expo devtools library quirk](expo-devtools-glib.md) — The optional React Native DevTools binary may fail on missing libglib even when Metro and the Expo preview work.
