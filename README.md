@@ -69,9 +69,11 @@ The API foundation is intentionally small at this stage:
 - `artifacts/api-server` hosts an Express application under `/api`.
 - `GET /api/healthz` is the currently implemented endpoint.
 - `GET /api/readyz` reports whether both logical MongoDB connections are ready.
+- `GET /api/auth/me` and the temporary `/api/auth/test/*` routes exercise the authentication and authorization foundation.
 - `artifacts/api-server/src/db` owns separate clinical and analytics Mongoose connections.
 - `artifacts/api-server/src/config` validates environment configuration at startup.
 - `artifacts/api-server/src/middleware` provides Helmet, explicit CORS, rate limiting, request IDs, body limits, error handling, and Zod validation helpers.
+- `artifacts/api-server/src/auth` verifies Clerk requests and provides server-controlled role and organization authorization helpers.
 - `lib/api-spec/openapi.yaml` is the source OpenAPI document.
 - `lib/api-zod` contains generated validation schemas and API types.
 - `lib/api-client-react` contains the generated React Query client.
@@ -88,6 +90,7 @@ The mobile demo does **not** depend on the API server yet. Its local mock servic
 - AsyncStorage for device-local demo state
 - Express 5, CORS, Pino, and Pino HTTP logging for the API foundation
 - Mongoose and MongoDB Atlas connection boundaries
+- Clerk backend token verification
 - OpenAPI 3.1
 - Orval-generated API clients and Zod schemas
 - Vite and React for the component-preview sandbox
@@ -171,6 +174,9 @@ $env:PORT = "3000"
 $env:MONGODB_URI = "mongodb+srv://<user>:<password>@<cluster>/<default>"
 $env:MONGODB_CLINICAL_DB = "hackmatrix_clinical"
 $env:MONGODB_ANALYTICS_DB = "hackmatrix_analytics"
+$env:CLERK_SECRET_KEY = "sk_test_..."
+$env:CLERK_AUTHORIZED_PARTIES = "http://localhost:8081,http://localhost:5173"
+$env:CLERK_ROLE_CLAIM = "metadata.role"
 pnpm --filter @workspace/api-server run dev
 ```
 
@@ -194,6 +200,52 @@ http://localhost:3000/api/readyz
 `/api/healthz` only confirms that the process is alive. `/api/readyz` returns `200` only when both the clinical and analytics Mongoose connections are ready, and returns `503` without exposing connection details otherwise.
 
 The server builds to `artifacts/api-server/dist` before starting. The generated output is ignored by Git.
+
+## Authentication and authorization foundation
+
+The backend uses Clerk to verify bearer/session authentication server-side. Set these variables for the API:
+
+```text
+CLERK_SECRET_KEY=sk_test_... or sk_live_...
+CLERK_AUTHORIZED_PARTIES=https://mobile.example.com,https://admin.example.com
+CLERK_ROLE_CLAIM=metadata.role
+```
+
+`CLERK_SECRET_KEY` is required in production. `CLERK_AUTHORIZED_PARTIES` should list the exact trusted client origins/parties used by the deployed clients. The default role claim path is `metadata.role`; it can be changed only through server configuration.
+
+Roles are assigned in the Clerk-controlled session claims configuration, not by the client. The currently supported values are exactly:
+
+- `PATIENT`
+- `CLINICIAN`
+- `ADMIN`
+
+Before deploying, configure a Clerk session token/JWT claim at `metadata.role` (or set `CLERK_ROLE_CLAIM` to the server-approved claim path) and provision the appropriate value through trusted Clerk administration. A missing or invalid role produces `403 ROLE_NOT_ASSIGNED`; the backend never defaults to a privileged role.
+
+The request pipeline is:
+
+```text
+Clerk bearer/session token
+  -> Clerk signature and request verification
+  -> normalized userId, role, organizationId
+  -> requireAuth()
+  -> requireRole("PATIENT" | "CLINICIAN" | "ADMIN")
+  -> organization authorization
+  -> future patient/grant/scope authorization
+```
+
+The backend ignores role values in query parameters, request bodies, custom headers, AsyncStorage, and frontend navigation state. The existing mobile role selector remains a demo-only UI and is not connected to these protected backend routes.
+
+Temporary foundation endpoints:
+
+```text
+GET /api/auth/me
+GET /api/auth/test/patient
+GET /api/auth/test/clinician
+GET /api/auth/test/admin
+GET /api/auth/test/organization/:organizationId
+```
+
+These routes expose only authorization-test status or normalized identity fields; they do not expose clinical data. They are intended for foundation testing and should be removed or placed behind an internal feature boundary before production launch.
 
 ### Run the component-preview sandbox
 

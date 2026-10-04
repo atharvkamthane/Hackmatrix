@@ -5,6 +5,7 @@ import test from "node:test";
 import { createApp } from "./app";
 import { loadConfig, type AppConfig } from "./config/env";
 import type { DatabaseConnections } from "./db";
+import type { VerifiedClerkIdentity } from "./auth";
 
 function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -54,6 +55,13 @@ async function request(
   });
 }
 
+function authApp(identity: VerifiedClerkIdentity | null) {
+  return createApp({
+    config: testConfig(),
+    verifyClerkRequest: async () => identity,
+  });
+}
+
 test("health endpoint confirms process liveness", async () => {
   const response = await request(createApp({ config: testConfig() }), "/api/healthz");
   assert.equal(response.status, 200);
@@ -99,6 +107,62 @@ test("security middleware sets headers and allows configured CORS origins", asyn
 test("disallowed CORS requests return the centralized error shape", async () => {
   const response = await request(createApp({ config: testConfig() }), "/api/healthz", {
     Origin: "http://blocked.test",
+  });
+
+  test("unauthenticated requests return 401", async () => {
+    const response = await request(authApp(null), "/api/auth/me");
+    assert.equal(response.status, 401);
+    assert.equal(JSON.parse(response.body).error.code, "UNAUTHENTICATED");
+  });
+
+  test("patient cannot access clinician endpoint", async () => {
+    const response = await request(
+      authApp({ userId: "user_patient", roleClaim: "PATIENT", organizationId: "org_1" }),
+      "/api/auth/test/clinician",
+    );
+    assert.equal(response.status, 403);
+  });
+
+  test("clinician cannot access admin endpoint", async () => {
+    const response = await request(
+      authApp({ userId: "user_clinician", roleClaim: "CLINICIAN", organizationId: "org_1" }),
+      "/api/auth/test/admin",
+    );
+    assert.equal(response.status, 403);
+  });
+
+  test("admin cannot access patient endpoint", async () => {
+    const response = await request(
+      authApp({ userId: "user_admin", roleClaim: "ADMIN", organizationId: "org_1" }),
+      "/api/auth/test/patient",
+    );
+    assert.equal(response.status, 403);
+  });
+
+  test("client supplied role cannot elevate verified identity", async () => {
+    const response = await request(
+      authApp({ userId: "user_patient", roleClaim: "PATIENT", organizationId: "org_1" }),
+      "/api/auth/test/admin?role=ADMIN",
+    );
+    assert.equal(response.status, 403);
+  });
+
+  test("organization mismatch is rejected", async () => {
+    const response = await request(
+      authApp({ userId: "user_clinician", roleClaim: "CLINICIAN", organizationId: "org_1" }),
+      "/api/auth/test/organization/org_2",
+    );
+    assert.equal(response.status, 403);
+    assert.equal(JSON.parse(response.body).error.code, "ORGANIZATION_FORBIDDEN");
+  });
+
+  test("missing server role is rejected instead of defaulted", async () => {
+    const response = await request(
+      authApp({ userId: "user_unknown", roleClaim: undefined, organizationId: null }),
+      "/api/auth/me",
+    );
+    assert.equal(response.status, 403);
+    assert.equal(JSON.parse(response.body).error.code, "ROLE_NOT_ASSIGNED");
   });
   assert.equal(response.status, 500);
   const body = JSON.parse(response.body);

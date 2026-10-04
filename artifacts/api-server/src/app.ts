@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import pinoHttp from "pino-http";
 import { loadConfig, type AppConfig } from "./config/env";
 import { type DatabaseConnections } from "./db";
+import { createClerkVerifier, type VerifyClerkRequest } from "./auth";
 import { errorHandler } from "./middleware/error-handler";
 import { requestIdMiddleware } from "./middleware/request-id";
 import { createSecurityMiddleware } from "./middleware/security";
@@ -11,10 +12,16 @@ import { logger } from "./lib/logger";
 export interface AppDependencies {
   config?: AppConfig;
   connections?: DatabaseConnections;
+  verifyClerkRequest?: VerifyClerkRequest;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
   const config = dependencies.config ?? loadConfig();
+  const verifyClerkRequest =
+    dependencies.verifyClerkRequest ??
+    (config.CLERK_SECRET_KEY
+      ? createClerkVerifier(config)
+      : async () => null);
   const security = createSecurityMiddleware(config);
   const app: Express = express();
 
@@ -44,7 +51,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", security.apiRateLimit);
   app.use("/api/auth", security.sensitiveRateLimit);
   app.use("/api/qr", security.sensitiveRateLimit);
-  app.use("/api", createApiRouter(dependencies.connections));
+  app.use("/api", createApiRouter(dependencies.connections, verifyClerkRequest));
   app.use(errorHandler);
 
   return app;
