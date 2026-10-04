@@ -43,8 +43,7 @@ This is a pnpm workspace:
 ├── lib/
 │   ├── api-spec/            # OpenAPI source specification
 │   ├── api-client-react/    # Generated React Query API client
-│   ├── api-zod/             # Generated Zod schemas and types
-│   └── db/                  # Drizzle database package foundation
+│   └── api-zod/             # Generated Zod schemas and types
 ├── scripts/                 # Workspace utility scripts
 ├── package.json             # Root workspace scripts
 ├── pnpm-workspace.yaml      # Workspace packages and dependency catalog
@@ -69,12 +68,15 @@ The API foundation is intentionally small at this stage:
 
 - `artifacts/api-server` hosts an Express application under `/api`.
 - `GET /api/healthz` is the currently implemented endpoint.
+- `GET /api/readyz` reports whether both logical MongoDB connections are ready.
+- `artifacts/api-server/src/db` owns separate clinical and analytics Mongoose connections.
+- `artifacts/api-server/src/config` validates environment configuration at startup.
+- `artifacts/api-server/src/middleware` provides Helmet, explicit CORS, rate limiting, request IDs, body limits, error handling, and Zod validation helpers.
 - `lib/api-spec/openapi.yaml` is the source OpenAPI document.
 - `lib/api-zod` contains generated validation schemas and API types.
 - `lib/api-client-react` contains the generated React Query client.
-- `lib/db` is the Drizzle package boundary for a future persistent implementation; it currently has no application tables.
 
-The mobile demo does **not** depend on the API server or database. Its local mock service is the source of truth for the current demo experience.
+The mobile demo does **not** depend on the API server yet. Its local mock service remains the source of truth for the current demo experience while the backend foundation is established. Clinical models, Clerk authentication, consent endpoints, QR resolution, realtime events, and analytics repositories are intentionally not implemented in this phase.
 
 ## Technology stack
 
@@ -85,9 +87,9 @@ The mobile demo does **not** depend on the API server or database. Its local moc
 - React 19
 - AsyncStorage for device-local demo state
 - Express 5, CORS, Pino, and Pino HTTP logging for the API foundation
+- Mongoose and MongoDB Atlas connection boundaries
 - OpenAPI 3.1
 - Orval-generated API clients and Zod schemas
-- Drizzle ORM package boundary
 - Vite and React for the component-preview sandbox
 
 ## Prerequisites
@@ -161,11 +163,14 @@ The mobile build script creates a web export. The `serve` script serves the gene
 
 ### Run the API server
 
-The API server requires a positive `PORT` environment variable:
+The API server requires a positive `PORT` environment variable. In production it also requires `MONGODB_URI`; development and tests can start without MongoDB, but `/api/readyz` remains unavailable until both logical database connections are configured and connected.
 
 ```bash
 # PowerShell
 $env:PORT = "3000"
+$env:MONGODB_URI = "mongodb+srv://<user>:<password>@<cluster>/<default>"
+$env:MONGODB_CLINICAL_DB = "hackmatrix_clinical"
+$env:MONGODB_ANALYTICS_DB = "hackmatrix_analytics"
 pnpm --filter @workspace/api-server run dev
 ```
 
@@ -179,6 +184,14 @@ Then check the health endpoint:
 ```text
 http://localhost:3000/api/healthz
 ```
+
+Readiness is intentionally separate:
+
+```text
+http://localhost:3000/api/readyz
+```
+
+`/api/healthz` only confirms that the process is alive. `/api/readyz` returns `200` only when both the clinical and analytics Mongoose connections are ready, and returns `503` without exposing connection details otherwise.
 
 The server builds to `artifacts/api-server/dist` before starting. The generated output is ignored by Git.
 
