@@ -40,13 +40,13 @@ export function Screen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { role, switchDemoRole } = useAppContext();
+  const { role, signOut } = useAppContext();
   const router = useRouter();
   const webTop = Platform.OS === 'web' ? 67 : 10;
   const bottomSpace = Platform.OS === 'web' ? 110 : 104 + insets.bottom;
-  const handleRoleSwitch = async () => {
-    await switchDemoRole();
-    router.replace((role === 'patient' ? '/(clinician)/(tabs)' : '/(patient)/(tabs)') as never);
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/' as never);
   };
   const body = (
     <View style={[styles.content, { paddingTop: insets.top + webTop, paddingBottom: bottomSpace }, contentStyle]}>
@@ -71,14 +71,14 @@ export function Screen({
         {showRoleSwitch && role ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Switch from ${role} demo role`}
-            onPress={() => void handleRoleSwitch()}
-            testID="switch-demo-role"
+            accessibilityLabel="Sign out"
+            onPress={() => void handleSignOut()}
+            testID="sign-out"
             style={[styles.roleChip, { backgroundColor: colors.secondary }]}
           >
-            <Feather name="repeat" size={13} color={colors.primary} />
+            <Feather name="log-out" size={13} color={colors.primary} />
             <Text style={[styles.roleChipText, { color: colors.secondaryForeground }]}>
-              {role === 'patient' ? 'Patient' : 'Clinician'}
+              Sign out
             </Text>
           </Pressable>
         ) : null}

@@ -6,7 +6,7 @@ The repository currently contains a working Expo mobile demonstration, a small A
 
 ## What the demo shows
 
-HackMatrix supports two local demo roles:
+HackMatrix has two mobile experiences selected from the authenticated, server-resolved role:
 
 - **Patient**
   - Review synthetic conditions, encounters, prescriptions, and observations.
@@ -78,7 +78,7 @@ The API foundation is intentionally small at this stage:
 - `lib/api-zod` contains generated validation schemas and API types.
 - `lib/api-client-react` contains the generated React Query client.
 
-The mobile demo does **not** depend on the API server yet. Its local mock service remains the source of truth for the current demo experience while the backend foundation is established. Clinical models, Clerk authentication, consent endpoints, QR resolution, realtime events, and analytics repositories are intentionally not implemented in this phase.
+The mobile app now uses Clerk for sign-in/sign-up and obtains its patient or clinician navigation role from the protected API. The bundled synthetic clinical screens still use a local mock service until their corresponding server endpoints are implemented; they are not protected production clinical operations. Clinical models, consent endpoints, QR resolution, realtime events, and analytics repositories are intentionally not implemented in this phase.
 
 ## Technology stack
 
@@ -163,6 +163,21 @@ pnpm --filter @workspace/hackmatrix-mobile run serve
 ```
 
 The mobile build script creates a web export. The `serve` script serves the generated output.
+
+### Configure Clerk for the Expo app
+
+Copy `artifacts/hackmatrix-mobile/.env.example` to `artifacts/hackmatrix-mobile/.env` and set these public mobile settings (the publishable key is safe to expose; do not place a Clerk secret key in a mobile app):
+
+```dotenv
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
+```
+
+For a physical phone, replace `localhost` in `EXPO_PUBLIC_API_BASE_URL` with the development machine's reachable LAN address and make sure the API CORS configuration permits the Expo development origin. In the Clerk Dashboard, enable the **Native API** and register the app's `hackmatrix-mobile` deep-link scheme/native application before creating a production build.
+
+The mobile client uses Clerk's hosted sign-in/sign-up flow, persists Clerk session state with Expo Secure Store, and sends a freshly retrieved Clerk session token as `Authorization: Bearer <token>` through `src/services/api.ts`. It then calls `GET /api/auth/me`; that response, rather than local storage, a route, or a role selector, determines patient versus clinician navigation. An `ADMIN` account is intentionally directed to the future web administration experience.
+
+To test end-to-end, assign the user a trusted server-side `PATIENT` or `CLINICIAN` role claim in Clerk, sign in on the mobile app, and confirm that `/api/auth/me` returns the expected normalized identity. The existing synthetic-screen mock remains solely for UI development until protected clinical API endpoints replace it.
 
 ### Run the API server
 

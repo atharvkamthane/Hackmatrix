@@ -1,10 +1,9 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { RoleGate } from '@/src/components/RoleGate';
 
 export default function ClinicianLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <RoleGate role="clinician"><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /></Stack></RoleGate>
   );
 }

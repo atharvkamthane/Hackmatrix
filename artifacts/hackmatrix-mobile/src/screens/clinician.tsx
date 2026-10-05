@@ -315,7 +315,7 @@ export function ClinicianPatientsScreen() {
 export function ClinicianWaitingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { switchDemoRole } = useAppContext();
+  const { signOut } = useAppContext();
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = typeof params.id === 'string' ? params.id : '';
   const [request, setRequest] = useState<AccessRequest | null>(null);
@@ -387,11 +387,11 @@ export function ClinicianWaitingScreen() {
             <>
               <InfoBanner title="Demo consent step" body="Switch to the patient role on this device and approve or deny the request in Access & consent. This button never approves on the clinician’s behalf." icon="repeat" />
               <Button
-                label="Switch to patient demo"
-                icon="repeat"
+                label="Sign out"
+                icon="log-out"
                 onPress={async () => {
-                  await switchDemoRole();
-                  router.replace('/(patient)/(tabs)/access' as never);
+                  await signOut();
+                  router.replace('/' as never);
                 }}
                 variant="secondary"
               />

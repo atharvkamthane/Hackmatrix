@@ -6,25 +6,29 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { useAuth, useClerk } from '@clerk/expo';
 import { services } from '@/src/services';
+import { getAuthenticatedIdentity, type AuthenticatedIdentity } from '@/src/services/api';
 import type { Role } from '@/src/types/models';
 import type { DemoAccessOverview } from '@/src/services/contracts';
 
 interface AppContextValue {
   role: Role | null;
   isReady: boolean;
+  identity: AuthenticatedIdentity | null;
   data: DemoAccessOverview | null;
   error: string | null;
-  signIn: (role: Role) => Promise<void>;
   signOut: () => Promise<void>;
-  switchDemoRole: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  const clerk = useClerk();
   const [role, setRole] = useState<Role | null>(null);
+  const [identity, setIdentity] = useState<AuthenticatedIdentity | null>(null);
   const [data, setData] = useState<DemoAccessOverview | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +45,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([services.auth.getSession(), services.patient.getDemoOverview()])
-      .then(([session, demoOverview]) => {
+    if (!isLoaded) return () => { mounted = false; };
+    if (!isSignedIn) {
+      setRole(null);
+      setIdentity(null);
+      setData(null);
+      setIsReady(true);
+      return () => { mounted = false; };
+    }
+
+    setIsReady(false);
+    Promise.all([getAuthenticatedIdentity(), services.patient.getDemoOverview()])
+      .then(async ([serverIdentity, demoOverview]) => {
         if (!mounted) return;
-        setRole(session?.role ?? null);
+        if (serverIdentity.role === 'ADMIN') {
+          throw new Error('Admin accounts must use the web administration experience.');
+        }
+        const resolvedRole: Role = serverIdentity.role === 'PATIENT' ? 'patient' : 'clinician';
+        // The mock dataset remains only for UI development. Its role is derived
+        // from the verified server response, never selected by the client.
+        await services.auth.signIn(resolvedRole);
+        if (!mounted) return;
+        setRole(resolvedRole);
+        setIdentity(serverIdentity);
         setData(demoOverview);
       })
       .catch((cause: unknown) => {
@@ -58,29 +81,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const signIn = useCallback(async (nextRole: Role) => {
-    const session = await services.auth.signIn(nextRole);
-    setRole(session.role);
-    await refresh();
-  }, [refresh]);
+  }, [isLoaded, isSignedIn]);
 
   const signOut = useCallback(async () => {
-    await services.auth.signOut();
+    await Promise.all([clerk.signOut(), services.auth.signOut()]);
     setRole(null);
-  }, []);
-
-  const switchDemoRole = useCallback(async () => {
-    const nextRole: Role = role === 'patient' ? 'clinician' : 'patient';
-    const session = await services.auth.signIn(nextRole);
-    setRole(session.role);
-    await refresh();
-  }, [refresh, role]);
+    setIdentity(null);
+    setData(null);
+  }, [clerk]);
 
   const value = useMemo(
-    () => ({ role, isReady, data, error, signIn, signOut, switchDemoRole, refresh }),
-    [data, error, isReady, refresh, role, signIn, signOut, switchDemoRole],
+    () => ({ role, identity, isReady, data, error, signOut, refresh }),
+    [data, error, identity, isReady, refresh, role, signOut],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
