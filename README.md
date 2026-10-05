@@ -166,19 +166,18 @@ The mobile build script creates a web export. The `serve` script serves the gene
 
 ### Run the API server
 
-The API server requires a positive `PORT` environment variable. In production it also requires `MONGODB_URI`; development and tests can start without MongoDB, but `/api/readyz` remains unavailable until both logical database connections are configured and connected.
+The API server loads configuration from environment variables. For local development, copy the root `.env.example` to `.env` and replace the placeholders with your MongoDB Atlas and Clerk values. `.env` is ignored by Git and must never be committed.
 
 ```bash
 # PowerShell
-$env:PORT = "3000"
-$env:MONGODB_URI = "mongodb+srv://<user>:<password>@<cluster>/<default>"
-$env:MONGODB_CLINICAL_DB = "hackmatrix_clinical"
-$env:MONGODB_ANALYTICS_DB = "hackmatrix_analytics"
-$env:CLERK_SECRET_KEY = "sk_test_..."
-$env:CLERK_AUTHORIZED_PARTIES = "http://localhost:8081,http://localhost:5173"
-$env:CLERK_ROLE_CLAIM = "metadata.role"
+Copy-Item .env.example .env
+# Edit .env and replace the placeholders, then run:
 pnpm --filter @workspace/api-server run dev
 ```
+
+The API startup imports `dotenv` before validating configuration and checks both the API package directory and repository root, so the root `.env` works with the pnpm workspace command. In production, set the same variables through the deployment platform's secret/environment settings instead of committing a file.
+
+The API server requires a positive `PORT` environment variable. In production it also requires `MONGODB_URI`; development and tests can start without MongoDB, but `/api/readyz` remains unavailable until both logical database connections are configured and connected.
 
 ```bash
 # macOS/Linux
