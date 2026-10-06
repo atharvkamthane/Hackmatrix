@@ -8,6 +8,7 @@ const environmentSchema = z
     MONGODB_CLINICAL_DB: z.string().trim().min(1).default("hackmatrix_clinical"),
     MONGODB_ANALYTICS_DB: z.string().trim().min(1).default("hackmatrix_analytics"),
     CLERK_SECRET_KEY: z.string().trim().min(1).optional(),
+    CLERK_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
     CLERK_AUTHORIZED_PARTIES: z.string().trim().optional(),
     CLERK_ROLE_CLAIM: z.string().trim().min(1).default("metadata.role"),
     CORS_ORIGINS: z.string().trim().min(1).optional(),
@@ -34,6 +35,13 @@ const environmentSchema = z
         code: z.ZodIssueCode.custom,
         path: ["CLERK_SECRET_KEY"],
         message: "CLERK_SECRET_KEY is required in production.",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.CLERK_PUBLISHABLE_KEY) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CLERK_PUBLISHABLE_KEY"],
+        message: "CLERK_PUBLISHABLE_KEY is required in production.",
       });
     }
   });

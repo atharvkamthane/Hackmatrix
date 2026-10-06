@@ -78,7 +78,7 @@ The API foundation is intentionally small at this stage:
 - `lib/api-zod` contains generated validation schemas and API types.
 - `lib/api-client-react` contains the generated React Query client.
 
-The mobile app now uses Clerk for sign-in/sign-up and obtains its patient or clinician navigation role from the protected API. The bundled synthetic clinical screens still use a local mock service until their corresponding server endpoints are implemented; they are not protected production clinical operations. Clinical models, consent endpoints, QR resolution, realtime events, and analytics repositories are intentionally not implemented in this phase.
+The mobile app now uses Clerk for sign-in/sign-up and obtains its patient or clinician navigation role from the protected API. The bundled synthetic clinical screens still use a local mock service until their corresponding server endpoints are implemented; they are not protected production clinical operations. Clinical persistence models are available on the server, while consent endpoints, QR resolution, realtime events, and analytics repositories remain intentionally deferred.
 
 ## Technology stack
 
@@ -260,6 +260,31 @@ GET /api/auth/test/organization/:organizationId
 ```
 
 These routes expose only authorization-test status or normalized identity fields; they do not expose clinical data. They are intended for foundation testing and should be removed or placed behind an internal feature boundary before production launch.
+
+## Clinical persistence foundation
+
+The API server defines the clinical models in
+[`artifacts/api-server/src/models`](./artifacts/api-server/src/models) and registers them
+against the `MONGODB_CLINICAL_DB` connection only. The models cover internal users,
+organizations, patient and clinician identities, encounters, conditions,
+medication requests, observations, QR-token metadata, access requests, access
+grants, and metadata-only audit logs.
+
+Patient and clinician records reference internal users and organizations. Authorization
+must resolve those relationships from the verified Clerk identity; request payload
+IDs are not an authorization source. Access request and grant scopes are limited to
+`visits`, `prescriptions`, and `labs`. QR records store only a SHA-256 token hash,
+never the raw token, and include expiry/used/revoked state.
+
+To seed a development database with deterministic synthetic records:
+
+```bash
+pnpm --filter @workspace/api-server run seed:clinical
+```
+
+This requires `MONGODB_URI` and writes only records marked with synthetic seed
+identifiers. It does not create API endpoints or implement QR, consent, realtime,
+ETL, or analytics behavior.
 
 ### Run the component-preview sandbox
 

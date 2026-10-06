@@ -16,7 +16,7 @@ export function LoginScreen() {
   const { isLoaded, isSignedIn } = useAuth();
   const clerk = useClerk();
   const { startHostedAuth } = useHostedAuth();
-  const { isReady, role, error } = useAppContext();
+  const { isReady, role, error, signOut } = useAppContext();
   const [loading, setLoading] = useState<'sign-in' | 'sign-up' | null>(null);
 
   useEffect(() => {
@@ -54,10 +54,18 @@ export function LoginScreen() {
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>A shared care space where your records are protected by your authenticated account.</Text>
       </View>
       <View style={styles.actions}>
-        <Button label="Sign in" icon="log-in" onPress={() => void beginAuthentication('sign-in')} loading={loading === 'sign-in'} />
-        <Button label="Create an account" icon="user-plus" variant="outline" onPress={() => void beginAuthentication('sign-up')} loading={loading === 'sign-up'} />
-        {error ? <InfoBanner title="Account access unavailable" body={error} tone="warning" icon="alert-circle" /> : null}
-        <InfoBanner title="Roles are assigned by HackMatrix" body="Your patient or clinician access is determined by the server after you sign in. This device cannot choose or change your role." tone="info" icon="shield" />
+        {isSignedIn ? (
+          <>
+            <InfoBanner title="Signed in" body={error ?? 'Verifying your server-assigned access…'} tone={error ? 'warning' : 'info'} icon={error ? 'alert-circle' : 'shield'} />
+            {error ? <Button label="Sign out" icon="log-out" variant="outline" onPress={() => void signOut()} /> : null}
+          </>
+        ) : (
+          <>
+            <Button label="Sign in" icon="log-in" onPress={() => void beginAuthentication('sign-in')} loading={loading === 'sign-in'} />
+            <Button label="Create an account" icon="user-plus" variant="outline" onPress={() => void beginAuthentication('sign-up')} loading={loading === 'sign-up'} />
+            <InfoBanner title="Roles are assigned by HackMatrix" body="Your patient or clinician access is determined by the server after you sign in. This device cannot choose or change your role." tone="info" icon="shield" />
+          </>
+        )}
       </View>
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>ADMIN access is available in the separate web experience.</Text>
     </View>

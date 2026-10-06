@@ -20,7 +20,10 @@ export function createClerkVerifier(config: AppConfig): VerifyClerkRequest {
   if (!config.CLERK_SECRET_KEY) {
     throw new Error("CLERK_SECRET_KEY is required to create Clerk authentication.");
   }
-  const clerkClient = createClerkClient({ secretKey: config.CLERK_SECRET_KEY });
+  const clerkClient = createClerkClient({
+    secretKey: config.CLERK_SECRET_KEY,
+    publishableKey: config.CLERK_PUBLISHABLE_KEY,
+  });
   return async (req) => {
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
