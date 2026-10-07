@@ -21,7 +21,7 @@ const seedDate = new Date("2026-01-01T00:00:00.000Z");
 
 async function seed(): Promise<void> {
   await connections.clinical.asPromise();
-  await Promise.all(Object.values(models).map((entry) => entry.syncIndexes()));
+  await Promise.all(Object.values(models).map((entry) => entry.createIndexes()));
 
   await Promise.all([
     models.AuditLog.deleteMany({ actorUserId: /^seed_/ }),

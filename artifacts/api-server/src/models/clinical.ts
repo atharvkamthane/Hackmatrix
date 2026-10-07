@@ -16,7 +16,6 @@ const organizationId = {
   type: Schema.Types.ObjectId,
   ref: "Organization",
   required: true,
-  index: true,
 } as const;
 
 const userId = {
@@ -163,7 +162,7 @@ const qrTokenSchema = new Schema(
   {
     tokenHash: { type: String, required: true, trim: true },
     patientId,
-    expiresAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, required: true },
     usedAt: Date,
     revokedAt: Date,
     createdByUserId: userId,
