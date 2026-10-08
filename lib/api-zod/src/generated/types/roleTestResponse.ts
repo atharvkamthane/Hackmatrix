@@ -5,7 +5,9 @@
  * HackMatrix Healthcare Consent & Clinical Exchange API
  * OpenAPI spec version: 0.1.0
  */
+import type { RoleTestResponseRole } from './roleTestResponseRole';
 
-export interface HealthStatus {
+export interface RoleTestResponse {
   status: string;
+  role: RoleTestResponseRole;
 }

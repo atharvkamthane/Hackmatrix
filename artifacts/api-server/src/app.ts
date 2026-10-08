@@ -7,6 +7,8 @@ import { errorHandler } from "./middleware/error-handler";
 import { requestIdMiddleware } from "./middleware/request-id";
 import { createSecurityMiddleware } from "./middleware/security";
 import { createApiRouter } from "./routes";
+import { createLandingRouter } from "./routes/landing";
+import { createDocsRouter } from "./routes/docs";
 import { logger } from "./lib/logger";
 
 export interface AppDependencies {
@@ -48,6 +50,8 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use(security.cors);
   app.use(express.json({ limit: config.BODY_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: config.BODY_LIMIT }));
+  app.use(createLandingRouter(config, dependencies.connections));
+  app.use(createDocsRouter());
   app.use("/api", security.apiRateLimit);
   app.use("/api/auth", security.sensitiveRateLimit);
   app.use("/api/qr", security.sensitiveRateLimit);

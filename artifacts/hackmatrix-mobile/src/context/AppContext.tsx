@@ -18,7 +18,9 @@ interface AppContextValue {
   identity: AuthenticatedIdentity | null;
   data: DemoAccessOverview | null;
   error: string | null;
+  signIn: (role: Role) => Promise<void>;
   signOut: () => Promise<void>;
+  switchDemoRole: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -43,56 +45,85 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Initialize demo session state on load
   useEffect(() => {
     let mounted = true;
-    if (!isLoaded) return () => { mounted = false; };
-    if (!isSignedIn) {
-      setRole(null);
-      setIdentity(null);
-      setData(null);
-      setIsReady(true);
-      return () => { mounted = false; };
-    }
+    services.auth.getSession().then(async (session) => {
+      if (!mounted) return;
+      if (session?.role) {
+        setRole(session.role);
+        const demoOverview = await services.patient.getDemoOverview().catch(() => null);
+        if (mounted && demoOverview) setData(demoOverview);
+      }
+      if (mounted) setIsReady(true);
+    }).catch(() => {
+      if (mounted) setIsReady(true);
+    });
+    return () => { mounted = false; };
+  }, []);
 
-    setIsReady(false);
-    Promise.all([getAuthenticatedIdentity(), services.patient.getDemoOverview()])
-      .then(async ([serverIdentity, demoOverview]) => {
+  // Handle Clerk authentication if signed in
+  useEffect(() => {
+    let mounted = true;
+    if (!isLoaded || !isSignedIn) return;
+
+    getAuthenticatedIdentity()
+      .then(async (serverIdentity) => {
         if (!mounted) return;
         if (serverIdentity.role === 'ADMIN') {
           throw new Error('Admin accounts must use the web administration experience.');
         }
         const resolvedRole: Role = serverIdentity.role === 'PATIENT' ? 'patient' : 'clinician';
-        // The mock dataset remains only for UI development. Its role is derived
-        // from the verified server response, never selected by the client.
         await services.auth.signIn(resolvedRole);
+        const demoOverview = await services.patient.getDemoOverview().catch(() => null);
         if (!mounted) return;
         setRole(resolvedRole);
         setIdentity(serverIdentity);
-        setData(demoOverview);
+        if (demoOverview) setData(demoOverview);
+        setError(null);
       })
       .catch((cause: unknown) => {
         if (mounted) {
-          setError(cause instanceof Error ? cause.message : 'Unable to load the demo.');
+          setError(
+            cause instanceof Error && cause.message.includes('role')
+              ? 'Signed in with Clerk, but no server role (PATIENT/CLINICIAN) is assigned in your Clerk metadata yet. You can choose a demo role below to explore.'
+              : cause instanceof Error ? cause.message : 'Unable to verify server authorization.'
+          );
         }
-      })
-      .finally(() => {
-        if (mounted) setIsReady(true);
       });
-    return () => {
-      mounted = false;
-    };
+
+    return () => { mounted = false; };
   }, [isLoaded, isSignedIn]);
 
+  const signIn = useCallback(async (nextRole: Role) => {
+    const session = await services.auth.signIn(nextRole);
+    const demoOverview = await services.patient.getDemoOverview().catch(() => null);
+    setRole(session.role);
+    if (demoOverview) setData(demoOverview);
+    setError(null);
+  }, []);
+
   const signOut = useCallback(async () => {
-    await Promise.all([clerk.signOut(), services.auth.signOut()]);
+    try {
+      if (isSignedIn) await clerk.signOut();
+    } catch {}
+    await services.auth.signOut();
     setRole(null);
     setIdentity(null);
     setData(null);
-  }, [clerk]);
+    setError(null);
+  }, [clerk, isSignedIn]);
+
+  const switchDemoRole = useCallback(async () => {
+    const nextRole: Role = role === 'patient' ? 'clinician' : 'patient';
+    const session = await services.auth.signIn(nextRole);
+    setRole(session.role);
+    await refresh();
+  }, [refresh, role]);
 
   const value = useMemo(
-    () => ({ role, identity, isReady, data, error, signOut, refresh }),
-    [data, error, identity, isReady, refresh, role, signOut],
+    () => ({ role, identity, isReady, data, error, signIn, signOut, switchDemoRole, refresh }),
+    [data, error, identity, isReady, refresh, role, signIn, signOut, switchDemoRole],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

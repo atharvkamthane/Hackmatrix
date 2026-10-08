@@ -5,7 +5,8 @@
  * HackMatrix Healthcare Consent & Clinical Exchange API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReadinessStatusStatus } from './readinessStatusStatus';
 
-export interface HealthStatus {
-  status: string;
+export interface ReadinessStatus {
+  status: ReadinessStatusStatus;
 }

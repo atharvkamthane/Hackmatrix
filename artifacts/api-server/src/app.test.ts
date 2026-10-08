@@ -170,3 +170,27 @@ test("disallowed CORS requests return the centralized error shape", async () => 
   assert.match(body.error.requestId, /^[0-9a-f-]{36}$/);
   assert.equal(body.error.message, "An unexpected error occurred.");
 });
+
+test("development landing page renders cleanly at GET /", async () => {
+  const response = await request(createApp({ config: testConfig() }), "/");
+  assert.equal(response.status, 200);
+  assert.ok(response.body.includes("HackMatrix API"));
+  assert.ok(response.body.includes("/api/healthz"));
+  assert.ok(response.body.includes("/docs"));
+});
+
+test("Swagger UI documentation renders at GET /docs and spec at /docs/openapi.json", async () => {
+  const app = createApp({ config: testConfig() });
+  const docsHtml = await request(app, "/docs");
+  assert.equal(docsHtml.status, 200);
+  assert.ok(docsHtml.body.includes("SwaggerUIBundle"));
+
+  const specJson = await request(app, "/docs/openapi.json");
+  assert.equal(specJson.status, 200);
+  const parsed = JSON.parse(specJson.body);
+  assert.equal(parsed.openapi, "3.1.0");
+  assert.ok(parsed.paths["/healthz"]);
+  assert.ok(parsed.paths["/readyz"]);
+  assert.ok(parsed.paths["/auth/me"]);
+});
+
