@@ -43,9 +43,18 @@ export function createClerkVerifier(config: AppConfig): VerifyClerkRequest {
 
     const auth = requestState.toAuth();
     const claims = auth.sessionClaims as Record<string, unknown>;
+    let roleClaim = readClaim(claims, config.CLERK_ROLE_CLAIM);
+    if (!roleClaim && auth.userId) {
+      try {
+        const user = await clerkClient.users.getUser(auth.userId);
+        roleClaim = (user.publicMetadata as Record<string, unknown>)?.role;
+      } catch {
+        // Fallback: role remains unassigned if not found
+      }
+    }
     return {
       userId: auth.userId,
-      roleClaim: readClaim(claims, config.CLERK_ROLE_CLAIM),
+      roleClaim,
       organizationId: typeof claims.org_id === "string" ? claims.org_id : null,
     };
   };
