@@ -64,21 +64,23 @@ The mobile app lives in [`artifacts/hackmatrix-mobile`](./artifacts/hackmatrix-m
 
 ### API and shared packages
 
-The API foundation is intentionally small at this stage:
+The API foundation provides:
 
 - `artifacts/api-server` hosts an Express application under `/api`.
-- `GET /api/healthz` is the currently implemented endpoint.
-- `GET /api/readyz` reports whether both logical MongoDB connections are ready.
-- `GET /api/auth/me` and the temporary `/api/auth/test/*` routes exercise the authentication and authorization foundation.
+- `GET /` provides an interactive API server landing page.
+- `GET /docs` serves interactive OpenAPI / Swagger UI documentation.
+- `GET /api/healthz` reports process liveness.
+- `GET /api/readyz` reports whether both clinical and analytics MongoDB connections are connected.
+- `GET /api/auth/me` and `/api/auth/test/{patient,clinician,admin,organization/:id}` exercise server-side Clerk verification and RBAC.
 - `artifacts/api-server/src/db` owns separate clinical and analytics Mongoose connections.
 - `artifacts/api-server/src/config` validates environment configuration at startup.
 - `artifacts/api-server/src/middleware` provides Helmet, explicit CORS, rate limiting, request IDs, body limits, error handling, and Zod validation helpers.
-- `artifacts/api-server/src/auth` verifies Clerk requests and provides server-controlled role and organization authorization helpers.
+- `artifacts/api-server/src/auth` verifies Clerk bearer tokens (with automatic fallback to Clerk `publicMetadata.role`) and enforces RBAC.
 - `lib/api-spec/openapi.yaml` is the source OpenAPI document.
 - `lib/api-zod` contains generated validation schemas and API types.
 - `lib/api-client-react` contains the generated React Query client.
 
-The mobile app now uses Clerk for sign-in/sign-up and obtains its patient or clinician navigation role from the protected API. The bundled synthetic clinical screens still use a local mock service until their corresponding server endpoints are implemented; they are not protected production clinical operations. Clinical persistence models are available on the server, while consent endpoints, QR resolution, realtime events, and analytics repositories remain intentionally deferred.
+The mobile app supports dual-mode login: instant Demo Mode ("Continue as Patient" / "Clinician") for rapid UI testing, and real Clerk authentication that resolves verified roles from `/api/auth/me`. The bundled clinical screens currently use synthetic seed state until corresponding protected clinical REST/GraphQL endpoints are integrated.
 
 ## Technology stack
 
@@ -148,11 +150,17 @@ This runs the workspace type check first and then invokes the build script for e
 pnpm --filter @workspace/hackmatrix-mobile run dev
 ```
 
-The app is configured for the managed Expo/Replit preview workflow. For a local Expo workflow, you can also invoke the installed Expo CLI directly from the mobile package:
+For testing locally with the Expo CLI directly:
 
 ```bash
-pnpm --filter @workspace/hackmatrix-mobile exec expo start
+# Web browser preview (runs at http://localhost:8081)
+pnpm --filter @workspace/hackmatrix-mobile exec expo start --port 8081
+
+# Physical device via Expo Go (QR code over local Wi-Fi)
+pnpm --filter @workspace/hackmatrix-mobile exec expo start --port 8081 --lan
 ```
+
+> **Note for Windows users**: If testing on a physical phone over Wi-Fi, ensure your Windows Firewall allows inbound TCP traffic on ports `8081` (Metro) and `3000` (API Server), and that your phone is connected to the same Wi-Fi network.
 
 Useful mobile package commands:
 
@@ -162,7 +170,16 @@ pnpm --filter @workspace/hackmatrix-mobile run build
 pnpm --filter @workspace/hackmatrix-mobile run serve
 ```
 
-The mobile build script creates a web export. The `serve` script serves the generated output.
+### Mobile Authentication Modes
+
+The mobile login screen provides two ways to access the app:
+
+1. **Demo Mode ("Continue as Patient" / "Continue as Clinician")**:
+   - Zero configuration needed. Tap either role to immediately test the patient or clinician UI, consent workflow, and records.
+2. **Clerk Authentication ("Sign in with Clerk")**:
+   - Tests production-grade authentication with `@clerk/expo`.
+   - Requires configured Clerk environment variables (see below).
+   - Once signed in, the app queries `GET /api/auth/me` to determine whether the user is a `PATIENT` or `CLINICIAN`.
 
 ### Configure Clerk for the Expo app
 
@@ -173,11 +190,7 @@ EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
 ```
 
-For a physical phone, replace `localhost` in `EXPO_PUBLIC_API_BASE_URL` with the development machine's reachable LAN address and make sure the API CORS configuration permits the Expo development origin. In the Clerk Dashboard, enable the **Native API** and register the app's `hackmatrix-mobile` deep-link scheme/native application before creating a production build.
-
-The mobile client uses Clerk's hosted sign-in/sign-up flow, persists Clerk session state with Expo Secure Store, and sends a freshly retrieved Clerk session token as `Authorization: Bearer <token>` through `src/services/api.ts`. It then calls `GET /api/auth/me`; that response, rather than local storage, a route, or a role selector, determines patient versus clinician navigation. An `ADMIN` account is intentionally directed to the future web administration experience.
-
-To test end-to-end, assign the user a trusted server-side `PATIENT` or `CLINICIAN` role claim in Clerk, sign in on the mobile app, and confirm that `/api/auth/me` returns the expected normalized identity. The existing synthetic-screen mock remains solely for UI development until protected clinical API endpoints replace it.
+For a physical phone, replace `localhost` in `EXPO_PUBLIC_API_BASE_URL` with your development PC's reachable LAN IP (e.g., `http://192.168.1.33:3000`) and ensure root `.env` `CORS_ORIGINS` includes your mobile origin. In the Clerk Dashboard, enable the **Native API** and register the app's `hackmatrix-mobile` deep-link scheme.
 
 ### Run the API server
 
@@ -227,13 +240,18 @@ CLERK_ROLE_CLAIM=metadata.role
 
 `CLERK_SECRET_KEY` is required in production. `CLERK_AUTHORIZED_PARTIES` should list the exact trusted client origins/parties used by the deployed clients. The default role claim path is `metadata.role`; it can be changed only through server configuration.
 
-Roles are assigned in the Clerk-controlled session claims configuration, not by the client. The currently supported values are exactly:
+Roles are assigned in Clerk administration, not by the client. The currently supported values are:
 
 - `PATIENT`
 - `CLINICIAN`
 - `ADMIN`
 
-Before deploying, configure a Clerk session token/JWT claim at `metadata.role` (or set `CLERK_ROLE_CLAIM` to the server-approved claim path) and provision the appropriate value through trusted Clerk administration. A missing or invalid role produces `403 ROLE_NOT_ASSIGNED`; the backend never defaults to a privileged role.
+**Setting user roles in Clerk**:
+Roles can be provisioned in either of two ways:
+1. **User `publicMetadata`** (easiest): In the Clerk Dashboard, open a user and add metadata `{"role": "PATIENT"}` or `{"role": "CLINICIAN"}`. The backend automatically reads this via Clerk API.
+2. **Session JWT Claims**: Configure a Clerk session token template claim at `metadata.role`.
+
+A missing or invalid role produces `403 ROLE_NOT_ASSIGNED`; the backend never defaults to a privileged role.
 
 The request pipeline is:
 
@@ -326,7 +344,7 @@ This repository contains a demonstration implementation only:
 - AsyncStorage is device-local. A second device will not see the first device's requests, grants, QR tokens, or records.
 - QR payloads contain opaque, temporary tokens rather than patient identifiers or clinical details.
 - The mobile app enforces role and scope checks in its mock service, but a production server must enforce them independently.
-- The API server currently exposes only a health check and is not connected to the mobile demo.
+- The API server provides health, readiness, and verified Clerk RBAC endpoints, while clinical records in the mobile demo currently use local synthetic fixtures pending full clinical API integration.
 - No production identity provider, audit-grade storage, encryption/key management, clinical interoperability, or regulatory compliance layer is implemented.
 
 Do not enter real patient data, credentials, access tokens, or other sensitive information into the demo.
