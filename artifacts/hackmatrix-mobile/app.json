@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "HackMatrix",
+    "slug": "hackmatrix-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon_2.png",
+    "scheme": "hackmatrix-mobile",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "web": {
+      "favicon": "./assets/images/icon_2.png"
+    },
+    "splash": {
+      "backgroundColor": "#F3F8F6",
+      "image": "./assets/images/icon_2.png",
+      "resizeMode": "contain"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow HackMatrix to scan temporary patient QR tokens.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

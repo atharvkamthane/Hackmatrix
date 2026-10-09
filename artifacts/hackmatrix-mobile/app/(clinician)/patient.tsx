@@ -1,0 +1,1 @@
+export { AuthorizedPatientScreen as default } from '@/src/screens/clinician';

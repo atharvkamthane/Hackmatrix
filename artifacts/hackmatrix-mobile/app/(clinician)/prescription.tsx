@@ -1,0 +1,1 @@
+export { CreatePrescriptionScreen as default } from '@/src/screens/clinician';

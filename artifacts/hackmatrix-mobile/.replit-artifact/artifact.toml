@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "HackMatrix"
+description = "A role-based mobile healthcare demo for patients and clinicians, with synthetic records, QR-based access requests, patient consent, and time-limited authorized record access."
+version = "1.0.0"
+id = "artifacts/hackmatrix-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 22671
+
+[services.development]
+run = "pnpm --filter @workspace/hackmatrix-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hackmatrix-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/hackmatrix-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "22671"
+BASE_PATH = "/"
