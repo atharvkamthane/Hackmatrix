@@ -127,6 +127,9 @@ export const openApiSpec = {
         },
       },
     },
+    "/auth/provision-self": {
+      post: authenticatedOperation("provisionSelf", "auth", "Self-provision authenticated identity as a test patient or clinician", "ProvisionSelfInput"),
+    },
     "/auth/test/patient": {
       get: {
         operationId: "testPatientRole",
@@ -332,6 +335,15 @@ export const openApiSpec = {
     },
     "/clinician/observations": {
       post: authenticatedOperation("createObservation", "clinician", "Create an observation within an active labs grant", "ObservationInput"),
+    },
+    "/clinician/me": {
+      get: authenticatedOperation("getClinicianProfile", "clinician", "Get the authenticated clinician's profile"),
+    },
+    "/clinician/conditions": {
+      post: authenticatedOperation("createCondition", "clinician", "Record a condition diagnosis within an active visits grant", "ConditionInput"),
+    },
+    "/admin/provision-user": {
+      post: authenticatedOperation("adminProvisionUser", "admin", "Admin-provision a new user account into an organization", "AdminProvisionInput"),
     },
     "/admin/summary": {
       get: authenticatedOperation("getAdminSummary", "admin", "Get K-suppressed aggregate system summary"),

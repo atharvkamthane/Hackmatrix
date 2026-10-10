@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { services } from '@/src/services';
-import { getAuthenticatedIdentity, type AuthenticatedIdentity } from '@/src/services/api';
+import { getAuthenticatedIdentity, ApiError, type AuthenticatedIdentity } from '@/src/services/api';
 import { getClerkInstance } from '@clerk/expo';
 import type { Role } from '@/src/types/models';
 import type { DemoAccessOverview } from '@/src/services/contracts';
@@ -30,11 +30,13 @@ export interface AppContextValue {
   userName: string | null;
   serverIdentity: AuthenticatedIdentity | null;
   isReady: boolean;
+  isUnprovisioned: boolean;
   data: DemoAccessOverview | null;
   error: string | null;
   signIn: (role: Role) => Promise<void>;
   signInDemo: (role: Role, customProfile?: { name: string; detail?: string }) => Promise<void>;
   signInProduction: () => Promise<void>;
+  provisionSelf: (role: 'PATIENT' | 'CLINICIAN', name: string, detail?: string) => Promise<void>;
   signOut: () => Promise<void>;
   switchDemoRole: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -48,6 +50,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [serverIdentity, setServerIdentity] = useState<AuthenticatedIdentity | null>(null);
+  const [isUnprovisioned, setIsUnprovisioned] = useState(false);
   const [data, setData] = useState<DemoAccessOverview | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,26 +96,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setRole(session.role);
             setUserName(session.name ?? null);
             setData(demoOverview);
+            setIsUnprovisioned(false);
           }
-        } else if (savedMode === 'production') {
+        } else {
+          // Check if there is an active Clerk session
+          let clerk;
           try {
-            const identity = await getAuthenticatedIdentity();
-            const accessOverview = await services.patient.getDemoOverview();
-            if (!mounted) return;
-            setAuthMode('production');
-            setServerIdentity(identity);
-            setRole(getMobileRole(identity));
-            setUserName(null);
-            setData(accessOverview);
-          } catch (prodErr) {
-            if (!mounted) return;
-            await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
-            setAuthMode(null);
-            setRole(null);
-            setUserName(null);
-            setServerIdentity(null);
-            setData(null);
-            setError(prodErr instanceof Error ? prodErr.message : 'Production session expired.');
+            clerk = getClerkInstance();
+          } catch {
+            // Clerk unconfigured
+          }
+          if (clerk?.session) {
+            try {
+              const identity = await getAuthenticatedIdentity();
+              const accessOverview = await services.patient.getDemoOverview();
+              if (!mounted) return;
+              setAuthMode('production');
+              setServerIdentity(identity);
+              setRole(getMobileRole(identity));
+              setUserName(null);
+              setData(accessOverview);
+              setIsUnprovisioned(false);
+            } catch (prodErr) {
+              if (!mounted) return;
+              if (prodErr instanceof ApiError && prodErr.code === 'USER_NOT_PROVISIONED') {
+                setAuthMode('production');
+                setIsUnprovisioned(true);
+                setError('Account is not provisioned in clinical records.');
+              } else {
+                await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
+                setAuthMode(null);
+                setRole(null);
+                setUserName(null);
+                setServerIdentity(null);
+                setData(null);
+                setIsUnprovisioned(false);
+                setError(prodErr instanceof Error ? prodErr.message : 'Production session expired.');
+              }
+            }
           }
         }
       } catch (cause) {
@@ -137,6 +158,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRole(session.role);
       setUserName(session.name ?? null);
       setServerIdentity(null);
+      setIsUnprovisioned(false);
       setError(null);
       const demoOverview = await services.patient.getDemoOverview();
       setData(demoOverview);
@@ -160,7 +182,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRole(appRole);
       setUserName(null);
       setData(accessOverview);
+      setIsUnprovisioned(false);
     } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'USER_NOT_PROVISIONED') {
+        setIsUnprovisioned(true);
+        setAuthMode('production');
+        setError('Your Clerk account is authenticated, but not yet provisioned in clinical records.');
+        throw cause;
+      }
       const msg = cause instanceof Error ? cause.message : 'Production sign-in failed.';
       await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
       setAuthMode(null);
@@ -168,10 +197,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserName(null);
       setServerIdentity(null);
       setData(null);
+      setIsUnprovisioned(false);
       setError(msg);
       throw cause;
     }
   }, []);
+
+  const provisionSelf = useCallback(async (selectedRole: 'PATIENT' | 'CLINICIAN', name: string, detail?: string) => {
+    try {
+      setError(null);
+      await services.auth.provisionSelf?.({ role: selectedRole, name, detail });
+      setIsUnprovisioned(false);
+      await signInProduction();
+    } catch (cause) {
+      const msg = cause instanceof Error ? cause.message : 'Provisioning failed.';
+      setError(msg);
+      throw cause;
+    }
+  }, [signInProduction]);
 
   const signOut = useCallback(async () => {
     try {
@@ -191,6 +234,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserName(null);
       setServerIdentity(null);
       setData(null);
+      setIsUnprovisioned(false);
       setError(null);
     }
   }, []);
@@ -215,17 +259,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       userName,
       serverIdentity,
       isReady,
+      isUnprovisioned,
       data,
       error,
       signIn,
       signInDemo,
       signInProduction,
+      provisionSelf,
       signOut,
       switchDemoRole,
       refresh,
       clearError,
     }),
-    [authMode, clearError, data, error, isReady, refresh, role, userName, serverIdentity, signIn, signInDemo, signInProduction, signOut, switchDemoRole],
+    [authMode, clearError, data, error, isReady, isUnprovisioned, refresh, role, userName, serverIdentity, signIn, signInDemo, signInProduction, provisionSelf, signOut, switchDemoRole],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

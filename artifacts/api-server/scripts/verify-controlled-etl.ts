@@ -21,11 +21,11 @@ async function main() {
 
   // 0. CLEANUP ANY STALE TEST ARTIFACTS BEFORE BASELINE
   console.log("\n[0/8] Pre-cleaning any stale test records from previous runs...");
-  const staleDeleted = await condsColl.deleteMany({ display: { $regex: TEST_TAG } });
+  const staleDeleted = await condsColl.deleteMany({ display: { $regex: /CONTROLLED_VERIFICATION_TEST|COVID-19 Respiratory Infection/ } });
   await orgsColl.deleteMany({ name: { $regex: TEST_TAG } });
   if (staleDeleted.deletedCount > 0) {
-    console.log(`  Removed ${staleDeleted.deletedCount} stale test conditions. Waiting 3s for ETL to reconcile...`);
-    await new Promise((resolve) => setTimeout(resolve, 3500));
+    console.log(`  Removed ${staleDeleted.deletedCount} stale test conditions. Waiting 4s for ETL to reconcile...`);
+    await new Promise((resolve) => setTimeout(resolve, 4000));
   }
 
   // 1. RECORD BASELINE

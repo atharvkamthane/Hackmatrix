@@ -7,7 +7,12 @@ async function useDemo(): Promise<boolean> {
 }
 
 export const services = {
-	auth: mockServices.auth,
+	auth: {
+		...mockServices.auth,
+		async provisionSelf(input: { role: 'PATIENT' | 'CLINICIAN'; name: string; detail?: string }) {
+			return remoteServices.provisionSelf(input);
+		},
+	},
 	patient: {
 		async getDemoOverview() {
 			return await useDemo() ? mockServices.patient.getDemoOverview() : remoteServices.getAccessOverview();
@@ -38,6 +43,11 @@ export const services = {
 		},
 	},
 	clinician: {
+		async getMe() {
+			return await useDemo()
+				? { id: 'clinician-demo-01', name: 'Dr. Maya Chen', organization: 'Harbor Health Clinic', role: 'CLINICIAN' }
+				: remoteServices.getClinicianMe();
+		},
 		async getDemoPatientQrToken() {
 			if (!await useDemo()) throw new Error('Demo QR tokens are unavailable in production mode.');
 			return mockServices.clinician.getDemoPatientQrToken();
@@ -59,6 +69,18 @@ export const services = {
 		},
 		async createObservation(input: Parameters<typeof mockServices.clinician.createObservation>[0]) {
 			return await useDemo() ? mockServices.clinician.createObservation(input) : remoteServices.createObservation(input);
+		},
+		async createCondition(input: { patientId: string; display: string; code?: string; date?: string }) {
+			if (await useDemo()) {
+				return {
+					id: `cond-demo-${Date.now()}`,
+					name: input.display,
+					status: 'Active' as const,
+					since: new Date().getFullYear().toString(),
+					note: input.code ?? 'RESP_COVID19',
+				};
+			}
+			return remoteServices.createCondition(input);
 		},
 	},
 	realtime: {

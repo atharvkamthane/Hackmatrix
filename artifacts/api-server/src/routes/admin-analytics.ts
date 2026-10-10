@@ -49,13 +49,14 @@ interface StoredAuditEvent {
 }
 
 export function aggregateCount(rows: readonly Pick<AggregateRow, "caseCount">[]): AggregateValue {
-  if (rows.length === 0) return { suppressed: true, reason: "NO_DATA" };
-  if (rows.some((row) => row.caseCount < K_THRESHOLD)) {
+  const activeRows = rows.filter((row) => row.caseCount > 0);
+  if (activeRows.length === 0) return { suppressed: true, reason: "NO_DATA" };
+  if (activeRows.some((row) => row.caseCount < K_THRESHOLD)) {
     return { suppressed: true, reason: "BELOW_K_THRESHOLD" };
   }
   return {
     suppressed: false,
-    count: rows.reduce((sum, row) => sum + row.caseCount, 0),
+    count: activeRows.reduce((sum, row) => sum + row.caseCount, 0),
   };
 }
 

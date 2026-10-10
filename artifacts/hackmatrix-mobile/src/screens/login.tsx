@@ -72,10 +72,10 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const clerk = useClerk();
-  const { isReady, role, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
+  const { isReady, role, isUnprovisioned, provisionSelf, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
 
-  // Top Tabs: Demo vs Clerk
-  const [mainTab, setMainTab] = useState<MainTab>('demo');
+  // Top Tabs: Clerk Production vs Demo Sandbox
+  const [mainTab, setMainTab] = useState<MainTab>('clerk');
 
   // Tab 1 (Demo) State
   const [demoMode, setDemoMode] = useState<DemoMode>('personas');
@@ -93,6 +93,12 @@ export function LoginScreen() {
   const [clerkPassword, setClerkPassword] = useState('');
   const [clerkError, setClerkError] = useState<string | null>(null);
   const [clerkNotice, setClerkNotice] = useState<string | null>(null);
+
+  // Clerk Provisioning State
+  const [provisionRole, setProvisionRole] = useState<'PATIENT' | 'CLINICIAN'>('PATIENT');
+  const [provisionName, setProvisionName] = useState('');
+  const [provisionDetail, setProvisionDetail] = useState('');
+  const [provisionLoading, setProvisionLoading] = useState(false);
 
   // Clerk Sign In 2FA / Device Trust
   const [needsVerification, setNeedsVerification] = useState(false);
@@ -116,6 +122,13 @@ export function LoginScreen() {
     clerk.user?.primaryEmailAddress?.emailAddress ??
     clerk.session?.user?.primaryEmailAddress?.emailAddress ??
     (clerk.session ? 'Active session' : null);
+
+  useEffect(() => {
+    if (clerk.user && !provisionName) {
+      const name = `${clerk.user.firstName || ''} ${clerk.user.lastName || ''}`.trim();
+      if (name) setProvisionName(name);
+    }
+  }, [clerk.user, provisionName]);
 
   useEffect(() => {
     if (!isReady || !role) return;
@@ -186,6 +199,25 @@ export function LoginScreen() {
       setClerkError(extractClerkErrorMessage(err));
     } finally {
       setClerkLoading(false);
+    }
+  };
+
+  // Clerk: Self-provision for testing
+  const handleSelfProvision = async () => {
+    clearError();
+    setClerkError(null);
+    setClerkNotice(null);
+    if (!provisionName.trim()) {
+      setClerkError('Please enter your full name to complete provisioning.');
+      return;
+    }
+    setProvisionLoading(true);
+    try {
+      await provisionSelf(provisionRole, provisionName.trim(), provisionDetail.trim() || undefined);
+    } catch (err: unknown) {
+      setClerkError(extractClerkErrorMessage(err));
+    } finally {
+      setProvisionLoading(false);
     }
   };
 
@@ -457,35 +489,8 @@ export function LoginScreen() {
         </Text>
       </View>
 
-      {/* Main Tab Switcher: Demo Sandbox vs Clerk Production */}
+      {/* Main Tab Switcher: Clerk Production vs Demo Sandbox */}
       <View style={[styles.tabContainer, { backgroundColor: colors.muted }]}>
-        <Pressable
-          style={[
-            styles.tabButton,
-            mainTab === 'demo' && [styles.tabButtonActive, { backgroundColor: colors.card }],
-          ]}
-          onPress={() => {
-            setMainTab('demo');
-            clearError();
-            setClerkError(null);
-          }}
-          testID="tab-demo"
-        >
-          <Feather
-            name="zap"
-            size={14}
-            color={mainTab === 'demo' ? colors.primary : colors.mutedForeground}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: mainTab === 'demo' ? colors.foreground : colors.mutedForeground },
-            ]}
-          >
-            Instant Sandbox
-          </Text>
-        </Pressable>
-
         <Pressable
           style={[
             styles.tabButton,
@@ -510,6 +515,33 @@ export function LoginScreen() {
             ]}
           >
             Clerk Auth
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.tabButton,
+            mainTab === 'demo' && [styles.tabButtonActive, { backgroundColor: colors.card }],
+          ]}
+          onPress={() => {
+            setMainTab('demo');
+            clearError();
+            setClerkError(null);
+          }}
+          testID="tab-demo"
+        >
+          <Feather
+            name="zap"
+            size={14}
+            color={mainTab === 'demo' ? colors.primary : colors.mutedForeground}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: mainTab === 'demo' ? colors.foreground : colors.mutedForeground },
+            ]}
+          >
+            Demo Sandbox
           </Text>
         </Pressable>
       </View>
@@ -820,7 +852,95 @@ export function LoginScreen() {
           {/* CLERK MODE 1: SIGN IN */}
           {clerkMode === 'signin' ? (
             <>
-              {activeClerkEmail && !needsVerification ? (
+              {activeClerkEmail && isUnprovisioned ? (
+                <Card style={styles.clerkCard}>
+                  <View style={styles.verificationHeader}>
+                    <View style={[styles.codeIcon, { backgroundColor: colors.infoSurface }]}>
+                      <Feather name="user-check" size={20} color={colors.info} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.clerkTitle, { color: colors.foreground }]}>
+                        Account Provisioning Required
+                      </Text>
+                      <Text style={[styles.clerkDescription, { color: colors.mutedForeground }]}>
+                        Logged in as {activeClerkEmail}
+                      </Text>
+                    </View>
+                  </View>
+                  <InfoBanner
+                    title="Clinical Record Not Linked"
+                    body="Your Clerk account is authenticated, but this user is not yet provisioned in HackMatrix clinical records. In development mode, you can self-provision as a test patient or test clinician below."
+                    tone="info"
+                    icon="shield"
+                  />
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 4 }]}>
+                    Select role to provision:
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                    <Pressable
+                      style={[
+                        styles.roleTogglePill,
+                        {
+                          borderColor: provisionRole === 'PATIENT' ? colors.primary : colors.border,
+                          backgroundColor: provisionRole === 'PATIENT' ? colors.secondary : 'transparent',
+                        },
+                      ]}
+                      onPress={() => setProvisionRole('PATIENT')}
+                      testID="provision-role-patient"
+                    >
+                      <Feather name="heart" size={15} color={provisionRole === 'PATIENT' ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.roleToggleText, { color: provisionRole === 'PATIENT' ? colors.primary : colors.foreground }]}>
+                        Test Patient
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.roleTogglePill,
+                        {
+                          borderColor: provisionRole === 'CLINICIAN' ? colors.primary : colors.border,
+                          backgroundColor: provisionRole === 'CLINICIAN' ? colors.secondary : 'transparent',
+                        },
+                      ]}
+                      onPress={() => setProvisionRole('CLINICIAN')}
+                      testID="provision-role-clinician"
+                    >
+                      <Feather name="briefcase" size={15} color={provisionRole === 'CLINICIAN' ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.roleToggleText, { color: provisionRole === 'CLINICIAN' ? colors.primary : colors.foreground }]}>
+                        Test Clinician
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <Field
+                    label="Full Name"
+                    placeholder={provisionRole === 'PATIENT' ? 'e.g. John Doe' : 'e.g. Dr. Jane Smith'}
+                    value={provisionName}
+                    onChangeText={setProvisionName}
+                    testID="provision-name-input"
+                  />
+                  <Field
+                    label={provisionRole === 'PATIENT' ? 'Medical Note / Condition' : 'Department / Specialty'}
+                    placeholder={provisionRole === 'PATIENT' ? 'e.g. Asthma, Hypertension' : 'e.g. Harbor Health Clinic — Primary Care'}
+                    value={provisionDetail}
+                    onChangeText={setProvisionDetail}
+                    testID="provision-detail-input"
+                  />
+                  <Button
+                    label={`Complete Provisioning & Enter as ${provisionRole === 'PATIENT' ? 'Patient' : 'Clinician'}`}
+                    icon="check"
+                    onPress={() => void handleSelfProvision()}
+                    loading={provisionLoading}
+                    testID="self-provision-button"
+                  />
+                  <Button
+                    label="Sign out / Switch account"
+                    icon="log-out"
+                    variant="outline"
+                    onPress={() => void handleClerkSignOut()}
+                    loading={signOutLoading}
+                    testID="clerk-sign-out-button"
+                  />
+                </Card>
+              ) : activeClerkEmail && !needsVerification ? (
                 <Card style={styles.activeAccountCard}>
                   <View style={styles.activeAccountHeader}>
                     <View style={[styles.codeIcon, { backgroundColor: colors.infoSurface }]}>

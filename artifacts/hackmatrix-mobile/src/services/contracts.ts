@@ -20,6 +20,7 @@ export interface AuthenticationService {
   getSession(): Promise<DemoSession | null>;
   signIn(role: Role, customProfile?: { name: string; detail?: string }): Promise<DemoSession>;
   signOut(): Promise<void>;
+  provisionSelf?(input: { role: 'PATIENT' | 'CLINICIAN'; name: string; detail?: string }): Promise<{ success: boolean; message: string; user: any }>;
 }
 
 export interface DemoAccessOverview {
@@ -41,6 +42,7 @@ export interface PatientService {
 }
 
 export interface ClinicianService {
+  getMe?(): Promise<{ id: string; name: string; professionalId?: string; organization: string; role: string }>;
   getDemoPatientQrToken(): Promise<PatientQrToken>;
   resolveQrToken(opaqueToken: string): Promise<AccessRequest>;
   getAccessRequest(id: string): Promise<AccessRequest | null>;
@@ -48,6 +50,7 @@ export interface ClinicianService {
   createEncounter(input: Pick<Encounter, 'diagnosis' | 'reason' | 'date'> & { patientId: string }): Promise<Encounter>;
   createPrescription(input: Pick<Prescription, 'drug' | 'dose' | 'frequency' | 'start' | 'end'> & { patientId: string }): Promise<Prescription>;
   createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'> & { patientId: string }): Promise<Observation>;
+  createCondition?(input: { patientId: string; display: string; code?: string; date?: string }): Promise<Condition>;
 }
 
 export interface RealtimeService {

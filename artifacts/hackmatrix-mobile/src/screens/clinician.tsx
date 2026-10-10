@@ -199,6 +199,8 @@ export function ClinicianScannerScreen() {
     }
   };
 
+  const [manualToken, setManualToken] = useState('');
+
   const onBarcodeScanned = (result: BarcodeScanningResult) => {
     void createRequest(result.data);
   };
@@ -238,11 +240,11 @@ export function ClinicianScannerScreen() {
           </View>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Camera access needed</Text>
           <Text style={[styles.recordSub, { color: colors.mutedForeground, textAlign: 'center' }]}>
-            Allow camera access to scan a patient’s temporary QR token. The token is submitted to the demo service only.
+            Allow camera access to scan a patient’s temporary QR token. Or use manual token entry below.
           </Text>
           <Button label="Enable camera" icon="camera" onPress={() => void requestPermission()} />
           {permission.status === 'denied' && !permission.canAskAgain && Platform.OS !== 'web' ? (
-            <Text style={[styles.recordSub, { color: colors.warning, textAlign: 'center' }]}>Camera permission is blocked in device settings. You can still use the demo scan below.</Text>
+            <Text style={[styles.recordSub, { color: colors.warning, textAlign: 'center' }]}>Camera permission is blocked in device settings. You can still enter the token below.</Text>
           ) : null}
         </Card>
       ) : (
@@ -266,8 +268,35 @@ export function ClinicianScannerScreen() {
           {hasScanned && !busy ? <Button label="Scan again" icon="refresh-cw" onPress={resetScanner} variant="secondary" /> : null}
         </Card>
       )}
+
+      {/* Manual Token Entry for emulators, browser preview, and tests */}
+      <Card style={{ padding: 14, gap: 10, marginTop: 4 }}>
+        <Text style={[styles.cardTitle, { fontSize: 13, textAlign: 'left', color: colors.foreground }]}>
+          Manual Token Entry / Remote Testing
+        </Text>
+        <Text style={[styles.recordSub, { color: colors.mutedForeground }]}>
+          If scanning the physical screen is unavailable, paste the patient’s single-use QR token:
+        </Text>
+        <Field
+          label="Token"
+          placeholder="Paste or enter token payload"
+          value={manualToken}
+          onChangeText={setManualToken}
+          autoCapitalize="none"
+          testID="manual-qr-token-input"
+        />
+        <Button
+          label="Resolve token & request access"
+          icon="arrow-right"
+          onPress={() => void createRequest(manualToken.trim())}
+          loading={busy}
+          disabled={!manualToken.trim()}
+          testID="submit-manual-qr-token"
+        />
+      </Card>
+
       {isDemoMode ? <Button label="Run demo scan" icon="grid" onPress={() => void simulateScan()} loading={busy} variant="outline" testID="simulate-qr-scan" /> : null}
-      <Text style={[styles.centerNote, { color: colors.mutedForeground }]}>{isDemoMode ? 'Camera scans resolve against this device’s local demo data. Use Run demo scan for the complete one-device consent flow.' : 'Camera scans are verified by the shared API. Scanning creates a request; it never grants record access.'}</Text>
+      <Text style={[styles.centerNote, { color: colors.mutedForeground }]}>{isDemoMode ? 'Camera scans resolve against this device’s local demo data. Use Run demo scan for the complete one-device consent flow.' : 'Camera scans and token resolutions are verified by the shared API. Creating a request never grants immediate record access.'}</Text>
     </Screen>
   );
 }
@@ -491,6 +520,7 @@ export function AuthorizedPatientScreen() {
           <SectionTitle title="Document a visit" />
           <Card style={styles.actionList}>
             <Button label="Create encounter" icon="file-plus" onPress={() => router.push({ pathname: '/(clinician)/encounter' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
+            <Button label="Record condition" icon="heart" onPress={() => router.push({ pathname: '/(clinician)/condition' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
             <Button label="Create prescription" icon="clipboard" onPress={() => router.push({ pathname: '/(clinician)/prescription' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
             <Button label="Add observation" icon="activity" onPress={() => router.push({ pathname: '/(clinician)/observation' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
           </Card>
@@ -638,6 +668,36 @@ export function CreateObservationScreen() {
       <Field label="Value" placeholder="e.g. 118/76" value={value} onChangeText={setValue} />
       <Field label="Unit" placeholder="e.g. mmHg (optional)" value={unit} onChangeText={setUnit} />
       <Field label="Date" value={date} onChangeText={setDate} hint="Use YYYY-MM-DD" />
+      {validation ? <ValidationMessage>{validation}</ValidationMessage> : null}
+    </AuthorizedForm>
+  );
+}
+
+export function CreateConditionScreen() {
+  const [display, setDisplay] = useState('');
+  const [code, setCode] = useState('RESP_COVID19');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [validation, setValidation] = useState('');
+  const save = async (patientId: string) => {
+    if (!display.trim()) {
+      setValidation('Condition diagnosis is required.');
+      throw new Error('Please enter the condition diagnosis.');
+    }
+    setValidation('');
+    if (services.clinician.createCondition) {
+      await services.clinician.createCondition({
+        patientId,
+        display: display.trim(),
+        code: code.trim() || undefined,
+        date: isValidDate(date) ? date : undefined,
+      });
+    }
+  };
+  return (
+    <AuthorizedForm title="Record condition" subtitle="Add a diagnosed condition to the patient record." onSave={save}>
+      <Field label="Condition diagnosis" placeholder="e.g. COVID-19 or Asthma" value={display} onChangeText={setDisplay} error={validation && !display.trim() ? 'Diagnosis is required.' : undefined} testID="condition-display-input" />
+      <Field label="Surveillance Code" placeholder="e.g. RESP_COVID19" value={code} onChangeText={setCode} hint="Diagnostic surveillance category for public health tracking" testID="condition-code-input" />
+      <Field label="Onset Date" value={date} onChangeText={setDate} hint="Use YYYY-MM-DD" testID="condition-date-input" />
       {validation ? <ValidationMessage>{validation}</ValidationMessage> : null}
     </AuthorizedForm>
   );
