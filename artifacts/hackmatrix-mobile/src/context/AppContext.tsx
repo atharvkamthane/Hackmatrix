@@ -15,6 +15,12 @@ import type { DemoAccessOverview } from '@/src/services/contracts';
 
 const AUTH_MODE_KEY = 'hackmatrix.auth.mode.v2';
 
+function getMobileRole(identity: AuthenticatedIdentity): Role {
+  if (identity.role === 'CLINICIAN') return 'clinician';
+  if (identity.role === 'PATIENT') return 'patient';
+  throw new Error('Administrator accounts cannot sign in to the clinical mobile application.');
+}
+
 export type AuthMode = 'demo' | 'production';
 
 export interface AppContextValue {
@@ -60,10 +66,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } else if (authMode === 'production') {
       try {
         const identity = await getAuthenticatedIdentity();
+        const accessOverview = await services.patient.getDemoOverview();
         setServerIdentity(identity);
-        const resolvedRole: Role = identity.role === 'CLINICIAN' ? 'clinician' : 'patient';
-        setRole(resolvedRole);
-        setData(null);
+        setRole(getMobileRole(identity));
+        setData(accessOverview);
         setError(null);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Failed to refresh production authorization.');
@@ -91,12 +97,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } else if (savedMode === 'production') {
           try {
             const identity = await getAuthenticatedIdentity();
+            const accessOverview = await services.patient.getDemoOverview();
             if (!mounted) return;
             setAuthMode('production');
             setServerIdentity(identity);
-            setRole(identity.role === 'CLINICIAN' ? 'clinician' : 'patient');
+            setRole(getMobileRole(identity));
             setUserName(null);
-            setData(null);
+            setData(accessOverview);
           } catch (prodErr) {
             if (!mounted) return;
             await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
@@ -145,13 +152,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
       const identity = await getAuthenticatedIdentity();
+      const appRole = getMobileRole(identity);
       await AsyncStorage.setItem(AUTH_MODE_KEY, 'production');
+      const accessOverview = await services.patient.getDemoOverview();
       setAuthMode('production');
       setServerIdentity(identity);
-      const appRole: Role = identity.role === 'CLINICIAN' ? 'clinician' : 'patient';
       setRole(appRole);
       setUserName(null);
-      setData(null);
+      setData(accessOverview);
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : 'Production sign-in failed.';
       await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});

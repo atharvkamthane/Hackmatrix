@@ -62,7 +62,32 @@ test("access requests and grants require explicit scopes", () => {
 
   assert.equal(accessRequest.validateSync(), undefined);
   assert.equal(grant.validateSync(), undefined);
+  assert.equal(accessRequest.requestedDurationMinutes, 60);
   assert.deepEqual(clinicalScopes, ["visits", "prescriptions", "labs"]);
+});
+
+test("access requests enforce permitted durations of 15, 30, and 60 minutes", () => {
+  for (const duration of [15, 30, 60]) {
+    const validRequest = new models.AccessRequest({
+      patientId,
+      clinicianId,
+      organizationId,
+      requestedScopes: ["visits"],
+      requestedDurationMinutes: duration,
+      expiresAt: new Date("2030-01-01"),
+    });
+    assert.equal(validRequest.validateSync(), undefined);
+  }
+
+  const invalidRequest = new models.AccessRequest({
+    patientId,
+    clinicianId,
+    organizationId,
+    requestedScopes: ["visits"],
+    requestedDurationMinutes: 45,
+    expiresAt: new Date("2030-01-01"),
+  });
+  assert.notEqual(invalidRequest.validateSync(), undefined);
 });
 
 test("expired and revoked grants are representable without changing patient identity", () => {
@@ -141,12 +166,12 @@ test("cannot register clinical models on a connection with analytics in dbName",
 });
 
 test("admin analytics route module does not import clinical models", () => {
-  const adminRoutePath = path.resolve(process.cwd(), "src/routes/admin.ts");
+  const adminRoutePath = path.resolve(process.cwd(), "src/routes/admin-analytics.ts");
   const adminContent = fs.readFileSync(adminRoutePath, "utf8");
   assert.equal(
     adminContent.includes("models/clinical"),
     false,
-    "admin.ts must not import clinical models directly",
+    "admin-analytics.ts must not import clinical models directly",
   );
 });
 

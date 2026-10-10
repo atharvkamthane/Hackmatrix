@@ -3,10 +3,9 @@ import { z } from "zod";
 const environmentSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    PORT: z.coerce.number().int().positive().default(3000),
+    PORT: z.coerce.number().int().positive().default(5000),
     MONGODB_URI: z.string().trim().min(1).optional(),
-    MONGODB_CLINICAL_DB: z.string().trim().min(1).default("hackmatrix_clinical"),
-    MONGODB_ANALYTICS_DB: z.string().trim().min(1).default("hackmatrix_analytics"),
+    MONGODB_DATABASE: z.string().trim().min(1).default("hackmatrix"),
     CLERK_SECRET_KEY: z.string().trim().min(1).optional(),
     CLERK_PUBLISHABLE_KEY: z.string().trim().min(1).optional(),
     CLERK_AUTHORIZED_PARTIES: z.string().trim().optional(),
@@ -55,7 +54,7 @@ export type AppConfig = Omit<z.infer<typeof environmentSchema>, "CORS_ORIGINS"> 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = environmentSchema.parse(env);
   const corsOriginsValue =
-    parsed.CORS_ORIGINS ?? "http://localhost:8081,http://localhost:5173";
+    parsed.CORS_ORIGINS ?? "http://localhost:3000,http://localhost:5173,http://localhost:8081,http://localhost:19006";
   const clerkAuthorizedParties = (parsed.CLERK_AUTHORIZED_PARTIES ?? "")
     .split(",")
     .map((party) => party.trim())

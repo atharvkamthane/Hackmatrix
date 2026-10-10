@@ -8,8 +8,16 @@ servers:
   - url: /api
     description: Base API path
 tags:
-  - name: health
-    description: Health operations
+  - name: system
+    description: Health and readiness
+  - name: auth
+    description: Clerk identity and server role capabilities
+  - name: patient
+    description: Patient-owned clinical data and consent
+  - name: clinician
+    description: Consent-controlled clinical workflows
+  - name: admin
+    description: Privacy-protected aggregates and audit summaries
 paths:
   /healthz:
     get:
@@ -24,7 +32,419 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /readyz:
+    get:
+      operationId: readinessCheck
+      tags: [system]
+      summary: Check MongoDB readiness
+      responses:
+        "200":
+          description: Database connections are ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessStatus"
+        "503":
+          description: Database connections are unavailable
+  /auth/me:
+    get:
+      operationId: getAuthenticatedUser
+      tags: [auth]
+      summary: Get the verified profile, role, and capabilities
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Server-resolved identity and permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /access/overview:
+    get:
+      operationId: getAccessOverview
+      tags: [patient]
+      summary: Get the caller's consent overview
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /patient/me:
+    get:
+      operationId: getPatientProfile
+      tags: [patient]
+      summary: Get the authenticated patient's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /patient/records:
+    get:
+      operationId: getPatientRecords
+      tags: [patient]
+      summary: Get the authenticated patient's own clinical records
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /patient/qr-token:
+    get:
+      operationId: createPatientQrToken
+      tags: [patient]
+      summary: Create a single-use, short-lived QR token
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /patient/access-requests:
+    get:
+      operationId: getPatientAccessRequests
+      tags: [patient]
+      summary: List the patient's access requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+  /patient/access-requests/{requestId}/decision:
+    post:
+      operationId: decidePatientAccessRequest
+      tags: [patient]
+      summary: Approve or deny a pending request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ObjectIdRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessDecision"
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Request expired or already decided
+  /patient/grants:
+    get:
+      operationId: getPatientGrants
+      tags: [patient]
+      summary: List the patient's consent grants
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+  /patient/grants/{grantId}/revoke:
+    post:
+      operationId: revokePatientGrant
+      tags: [patient]
+      summary: Revoke an active consent grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ObjectIdGrantId"
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/qr/resolve:
+    post:
+      operationId: resolvePatientQrToken
+      tags: [clinician]
+      summary: Consume a QR token and create a consent request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrResolve"
+      responses:
+        "201":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/access-requests/{requestId}:
+    get:
+      operationId: getClinicianAccessRequest
+      tags: [clinician]
+      summary: Get a request created by the clinician
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ObjectIdRequestId"
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/patients:
+    get:
+      operationId: getAuthorizedPatient
+      tags: [clinician]
+      summary: Get a patient covered by an active grant
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/patients/{patientId}:
+    get:
+      operationId: getAuthorizedPatientById
+      tags: [clinician]
+      summary: Get a specified patient covered by an active grant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ObjectIdPatientId"
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/encounters:
+    post:
+      operationId: createEncounter
+      tags: [clinician]
+      summary: Create an encounter within an active visits grant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EncounterInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/prescriptions:
+    post:
+      operationId: createPrescription
+      tags: [clinician]
+      summary: Create a prescription within an active prescriptions grant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrescriptionInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /clinician/observations:
+    post:
+      operationId: createObservation
+      tags: [clinician]
+      summary: Create an observation within an active labs grant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObservationInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [admin]
+      summary: Get K-suppressed aggregate system summary
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/trends:
+    get:
+      operationId: getAdminTrends
+      tags: [admin]
+      summary: Query privacy-protected disease trends
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: condition
+          in: query
+          schema: { type: string }
+        - name: startMonth
+          in: query
+          schema: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        - name: endMonth
+          in: query
+          schema: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/regions:
+    get:
+      operationId: getAdminRegions
+      tags: [admin]
+      summary: Get privacy-protected regional aggregates
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/conditions:
+    get:
+      operationId: getAdminConditions
+      tags: [admin]
+      summary: Get condition category aggregates
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/privacy-config:
+    get:
+      operationId: getAdminPrivacyConfig
+      tags: [admin]
+      summary: Get privacy threshold and aggregate metrics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/audit:
+    get:
+      operationId: getAdminAuditEvents
+      tags: [admin]
+      summary: Get paginated metadata-only audit events
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/security-events:
+    get:
+      operationId: getAdminSecurityEvents
+      tags: [admin]
+      summary: Get safe security event summaries
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ApiSuccess"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ObjectIdRequestId:
+      name: requestId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+    ObjectIdGrantId:
+      name: grantId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+    ObjectIdPatientId:
+      name: patientId
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+  responses:
+    ApiSuccess:
+      description: Successful API response
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiPayload" }
+    Unauthenticated:
+      description: Missing or invalid Clerk session
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Forbidden:
+      description: Role, organization, or consent denied
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +453,85 @@ components:
           type: string
       required:
         - status
+    ReadinessStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+      required:
+        - status
+    ApiPayload:
+      oneOf:
+        - type: object
+          additionalProperties: true
+        - type: array
+          items:
+            type: object
+            additionalProperties: true
+    AuthMeResponse:
+      type: object
+      properties:
+        userId: { type: string }
+        role: { type: string, enum: [PATIENT, CLINICIAN, ADMIN] }
+        organizationId: { type: [string, "null"] }
+        capabilities:
+          type: array
+          items: { type: string }
+      required: [userId, role, capabilities]
+    AccessDecision:
+      type: object
+      properties:
+        decision: { type: string, enum: [approved, denied] }
+      required: [decision]
+    QrResolve:
+      type: object
+      properties:
+        token: { type: string, maxLength: 128 }
+        scopes:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items: { type: string, enum: [visits, prescriptions, labs] }
+        durationMinutes: { type: integer, enum: [15, 30, 60], default: 60 }
+      required: [token]
+    EncounterInput:
+      type: object
+      properties:
+        patientId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        diagnosis: { type: string, maxLength: 200 }
+        reason: { type: string, maxLength: 500 }
+        date: { type: string, format: date }
+      required: [patientId, diagnosis, reason, date]
+    PrescriptionInput:
+      type: object
+      properties:
+        patientId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        drug: { type: string, maxLength: 200 }
+        dose: { type: string, maxLength: 120 }
+        frequency: { type: string, maxLength: 120 }
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+      required: [patientId, drug, dose, frequency, start, end]
+    ObservationInput:
+      type: object
+      properties:
+        patientId: { type: string, pattern: "^[a-fA-F0-9]{24}$" }
+        title: { type: string, maxLength: 200 }
+        value: { type: string, maxLength: 200 }
+        unit: { type: string, maxLength: 80 }
+        date: { type: string, format: date }
+      required: [patientId, title, value, unit, date]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            requestId: { type: string }
+          required: [code, message]
+      required: [error]
 

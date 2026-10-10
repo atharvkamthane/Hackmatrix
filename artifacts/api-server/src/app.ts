@@ -58,6 +58,7 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   app.use("/api", security.apiRateLimit);
   app.use("/api/auth", security.sensitiveRateLimit);
   app.use("/api/qr", security.sensitiveRateLimit);
+  app.use("/api/clinician/qr", security.sensitiveRateLimit);
   app.use(
     "/api",
     createApiRouter(

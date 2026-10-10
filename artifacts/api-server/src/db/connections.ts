@@ -12,15 +12,13 @@ export interface DatabaseConnections {
 }
 
 /**
- * Note on Database-Level Isolation:
- * Creating two Mongoose connections with distinct database names (e.g., MONGODB_CLINICAL_DB
- * and MONGODB_ANALYTICS_DB) using a shared MONGODB_URI credential provides logical separation,
- * but does NOT enforce database-level access isolation.
+ * Clinical and analytics use separate Mongoose connections and model boundaries
+ * inside one database. The collections remain logically separated, but this is
+ * not database-level access isolation when both connections share credentials.
  *
- * For full database-level isolation, MongoDB Atlas least-privilege users must be provisioned:
- * 1. clinical_rw: Read/write permissions strictly on the clinical database.
- * 2. analytics_ro: Read-only permissions strictly on the analytics database for admin queries.
- * 3. etl_worker: Read access on clinical collections, read/write on analytics collections.
+ * These connections share one URI and database, so they do not provide credential-level
+ * isolation. Production deployments need separately scoped MongoDB users/custom roles and
+ * a controlled aggregate ingestion process before treating the data planes as isolated.
  */
 export function createDatabaseConnections(config: AppConfig): DatabaseConnections {
   if (!config.MONGODB_URI) {
@@ -28,13 +26,13 @@ export function createDatabaseConnections(config: AppConfig): DatabaseConnection
   }
 
   const clinical = mongoose.createConnection(config.MONGODB_URI, {
-    dbName: config.MONGODB_CLINICAL_DB,
+    dbName: config.MONGODB_DATABASE,
     serverSelectionTimeoutMS: 5_000,
   });
   (clinical as unknown as { plane: string }).plane = "clinical";
 
   const analytics = mongoose.createConnection(config.MONGODB_URI, {
-    dbName: config.MONGODB_ANALYTICS_DB,
+    dbName: config.MONGODB_DATABASE,
     serverSelectionTimeoutMS: 5_000,
   });
   (analytics as unknown as { plane: string }).plane = "analytics";
