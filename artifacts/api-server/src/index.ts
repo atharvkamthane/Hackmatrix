@@ -1,13 +1,17 @@
 import path from "node:path";
 import http from "http";
 import type { Request } from "express";
+import type { DatabaseConnections } from "./db";
 
 if (typeof process.loadEnvFile === "function") {
-  try {
-    process.loadEnvFile(path.resolve(process.cwd(), ".env"));
-  } catch {
+  const envCandidates = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "../../.env"),
+  ];
+  for (const candidate of envCandidates) {
     try {
-      process.loadEnvFile(path.resolve(process.cwd(), "../../.env"));
+      process.loadEnvFile(candidate);
+      break;
     } catch {
       // .env optional
     }
@@ -25,34 +29,61 @@ async function startServer(): Promise<void> {
       import("./lib/logger"),
       import("./socket"),
     ]);
-  const config = loadConfig();
-  const connections = database.createDatabaseConnections(config);
+  const rawConfig = loadConfig();
+  const mongoUri = rawConfig.MONGODB_URI || (rawConfig.NODE_ENV !== "production" ? "mongodb://127.0.0.1:27017" : undefined);
+  const config = { ...rawConfig, ...(mongoUri ? { MONGODB_URI: mongoUri } : {}) };
+
+  let connections: DatabaseConnections | undefined;
+  let models: ReturnType<typeof createClinicalModels> | undefined;
+  let analyticsModels: ReturnType<typeof createAnalyticsModels> | undefined;
   let server: http.Server | undefined;
 
   try {
-    await database.connectDatabases(connections);
-    const models = createClinicalModels(connections.clinical);
-    const analyticsModels = createAnalyticsModels(connections.analytics);
-    await Promise.all([
-      models.User.createIndexes(),
-      models.Organization.createIndexes(),
-      models.Patient.createIndexes(),
-      models.Clinician.createIndexes(),
-      models.Encounter.createIndexes(),
-      models.Condition.createIndexes(),
-      models.MedicationRequest.createIndexes(),
-      models.Observation.createIndexes(),
-      models.QRToken.createIndexes(),
-      models.AccessRequest.createIndexes(),
-      models.AccessGrant.createIndexes(),
-      models.AuditLog.createIndexes(),
-      analyticsModels.SurveillanceAggregate.createIndexes(),
-      connections.analytics.collection("auditLogs").createIndex({ occurredAt: -1 }),
-    ]);
+    if (config.MONGODB_URI) {
+      try {
+        connections = database.createDatabaseConnections(config);
+        await database.connectDatabases(connections);
+        models = createClinicalModels(connections.clinical);
+        analyticsModels = createAnalyticsModels(connections.analytics);
+        await Promise.all([
+          models.User.createIndexes(),
+          models.Organization.createIndexes(),
+          models.Patient.createIndexes(),
+          models.Clinician.createIndexes(),
+          models.Encounter.createIndexes(),
+          models.Condition.createIndexes(),
+          models.MedicationRequest.createIndexes(),
+          models.Observation.createIndexes(),
+          models.QRToken.createIndexes(),
+          models.AccessRequest.createIndexes(),
+          models.AccessGrant.createIndexes(),
+          models.AuditLog.createIndexes(),
+          analyticsModels.SurveillanceAggregate.createIndexes(),
+          connections.analytics.collection("auditLogs").createIndex({ occurredAt: -1 }),
+        ]);
+        logger.info("MongoDB connected and indexes verified");
+      } catch (dbErr) {
+        if (config.NODE_ENV === "production") {
+          throw dbErr;
+        }
+        logger.warn(
+          { error: dbErr instanceof Error ? dbErr.message : String(dbErr) },
+          "MongoDB connection failed; starting server in degraded mode without database",
+        );
+        if (connections) {
+          await database.disconnectDatabases(connections).catch(() => undefined);
+          connections = undefined;
+        }
+      }
+    } else {
+      logger.warn("MONGODB_URI not provided; starting server in degraded mode without database");
+    }
+
     const verifyClerkRequest = config.CLERK_SECRET_KEY
       ? createClerkVerifier(config)
       : async () => null;
     const findInternalUser = async (clerkUserId: string) => {
+      if (!models) return null;
       const user = await models.User.findOne({ clerkUserId }).lean().exec();
       if (!user) return null;
       return {
@@ -92,10 +123,12 @@ async function startServer(): Promise<void> {
     });
     logger.info({ port: config.PORT }, "HackMatrix API Server listening with Socket.IO enabled");
 
-    for (const [name, connection] of Object.entries(connections)) {
-      connection.on("error", () => logger.error({ connection: name }, "MongoDB connection error"));
-      connection.on("disconnected", () => logger.warn({ connection: name }, "MongoDB connection lost"));
-      connection.on("connected", () => logger.info({ connection: name }, "MongoDB connection restored"));
+    if (connections) {
+      for (const [name, connection] of [["clinical", connections.clinical], ["analytics", connections.analytics]] as const) {
+        connection.on("error", () => logger.error({ connection: name }, "MongoDB connection error"));
+        connection.on("disconnected", () => logger.warn({ connection: name }, "MongoDB connection lost"));
+        connection.on("connected", () => logger.info({ connection: name }, "MongoDB connection restored"));
+      }
     }
 
     let shuttingDown = false;
@@ -107,7 +140,9 @@ async function startServer(): Promise<void> {
           await new Promise<void>((resolve, reject) => {
             server?.close((error) => error ? reject(error) : resolve());
           });
-          await database.disconnectDatabases(connections);
+          if (connections) {
+            await database.disconnectDatabases(connections);
+          }
           logger.info({ signal }, "HackMatrix API Server shut down cleanly");
         } catch {
           logger.error({ signal }, "HackMatrix API Server shutdown failed");
@@ -121,9 +156,15 @@ async function startServer(): Promise<void> {
     if (server?.listening) {
       await new Promise<void>((resolve) => server?.close(() => resolve()));
     }
-    await database.disconnectDatabases(connections).catch(() => undefined);
+    if (connections) {
+      await database.disconnectDatabases(connections).catch(() => undefined);
+    }
     logger.error(
-      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      {
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
       "HackMatrix API Server failed to start",
     );
     process.exitCode = 1;
