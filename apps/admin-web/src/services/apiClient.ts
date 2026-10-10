@@ -1,6 +1,11 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+let authTokenProvider: (() => Promise<string | null>) | null = null;
+
+export function setAuthTokenProvider(provider: (() => Promise<string | null>) | null): void {
+  authTokenProvider = provider;
+}
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -9,6 +14,16 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+});
+
+apiClient.interceptors.request.use(async (config) => {
+  const token = await authTokenProvider?.();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete config.headers.Authorization;
+  }
+  return config;
 });
 
 export interface ApiErrorPayload {

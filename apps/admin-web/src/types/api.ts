@@ -5,7 +5,7 @@ export interface AdminSummaryDTO {
     totalReportedCases: AggregateValue;
     monitoredConditionsCount: number;
     coveredRegionsCount: number;
-    lastUpdated: string;
+    lastUpdated: string | null;
     isDemoData?: boolean;
   };
   monthlyTrends: Array<{
@@ -26,7 +26,7 @@ export interface AdminSummaryDTO {
     stateName: string;
     districtName?: string;
     cases: AggregateValue;
-    riskLevel: 'LOW' | 'MODERATE' | 'ELEVATED' | 'HIGH';
+    riskLevel: 'LOW' | 'MODERATE' | 'ELEVATED' | 'HIGH' | 'UNKNOWN';
     lastReported: string;
   }>;
   recentActivity: Array<{
@@ -70,18 +70,18 @@ export interface RegionalDataDTO {
   districts: Array<{
     district: string;
     cases: AggregateValue;
-    activeSurveillanceSites: number;
+    activeSurveillanceSites: number | null;
     lastReportedDate: string;
   }>;
   stateTotalCases: AggregateValue;
-  coveragePercentage: number;
+  coveragePercentage: number | null;
 }
 
 export interface RegionsResponseDTO {
   regions: RegionalDataDTO[];
   totalStates: number;
   totalDistricts: number;
-  lastSyncTime: string;
+  lastSyncTime: string | null;
 }
 
 export interface ConditionCategoryDTO {

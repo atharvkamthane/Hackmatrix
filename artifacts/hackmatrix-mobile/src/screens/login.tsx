@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSignIn } from '@clerk/expo/legacy';
 import { Button, Card, InfoBanner, RoleLabel } from '@/src/components/ui';
 import { useAppContext } from '@/src/context/AppContext';
 import { useColors } from '@/hooks/useColors';
@@ -13,9 +14,13 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isReady, role, signInDemo, signInProduction, error, clearError } = useAppContext();
+  const { isLoaded: clerkLoaded, signIn, setActive } = useSignIn();
   const [selectedRole, setSelectedRole] = useState<Role>('patient');
+  const [emailAddress, setEmailAddress] = useState('');
+  const [password, setPassword] = useState('');
   const [demoLoading, setDemoLoading] = useState(false);
   const [prodLoading, setProdLoading] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isReady || !role) return;
@@ -37,11 +42,23 @@ export function LoginScreen() {
 
   const handleProductionSignIn = async () => {
     clearError();
+    setSignInError(null);
     setProdLoading(true);
     try {
+      if (!clerkLoaded || !signIn || !setActive) {
+        throw new Error('The identity provider is not ready. Please try again.');
+      }
+      const result = await signIn.create({
+        identifier: emailAddress.trim(),
+        password,
+      });
+      if (result.status !== 'complete' || !result.createdSessionId) {
+        throw new Error('This account requires an additional verification step that is not configured in this client.');
+      }
+      await setActive({ session: result.createdSessionId });
       await signInProduction();
-    } catch {
-      // Error handled by context and rendered in UI banner
+    } catch (cause) {
+      setSignInError(cause instanceof Error ? cause.message : 'Sign-in could not be completed.');
     } finally {
       setProdLoading(false);
     }
@@ -80,6 +97,7 @@ export function LoginScreen() {
           />
         </View>
       ) : null}
+      {signInError ? <View style={styles.errorContainer}><InfoBanner title="Sign-in failed" body={signInError} tone="warning" icon="alert-circle" /></View> : null}
 
       {/* Production Authentication Boundary */}
       <View style={styles.sectionHeader}>
@@ -92,6 +110,27 @@ export function LoginScreen() {
         <Text style={[styles.prodDescription, { color: colors.mutedForeground }]}>
           Authenticates through Clerk. Roles and permissions are server-controlled by the backend.
         </Text>
+        <TextInput
+          accessibilityLabel="Email address"
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          onChangeText={setEmailAddress}
+          placeholder="Email address"
+          placeholderTextColor={colors.mutedForeground}
+          style={[styles.credentialInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          value={emailAddress}
+        />
+        <TextInput
+          accessibilityLabel="Password"
+          autoComplete="password"
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={colors.mutedForeground}
+          secureTextEntry
+          style={[styles.credentialInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          value={password}
+        />
         <Button
           label="Sign in with Verified Identity"
           icon="shield"
@@ -174,6 +213,7 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   prodCard: { padding: 14, gap: 10, marginBottom: 16 },
+  credentialInput: { minHeight: 46, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontFamily: 'Inter_400Regular', fontSize: 13 },
   prodTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   prodDescription: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },

@@ -1,16 +1,42 @@
 import { Server as HttpServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, type Socket } from "socket.io";
 import { logger } from "./lib/logger";
 
 let io: SocketIOServer | null = null;
 
-export function initSocketServer(httpServer: HttpServer): SocketIOServer {
+export type AuthorizeAdminSocket = (
+  token: string,
+  headers: Socket["handshake"]["headers"],
+) => Promise<boolean>;
+
+export function initSocketServer(
+  httpServer: HttpServer,
+  allowedOrigins: string[],
+  authorizeAdminSocket: AuthorizeAdminSocket,
+): SocketIOServer {
   io = new SocketIOServer(httpServer, {
     path: "/socket.io",
     cors: {
-      origin: "*",
+      origin: allowedOrigins,
       methods: ["GET", "POST"],
     },
+  });
+
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (typeof token !== "string" || !token) {
+      next(new Error("UNAUTHENTICATED"));
+      return;
+    }
+    void authorizeAdminSocket(token, socket.handshake.headers)
+      .then((authorized) => {
+        if (!authorized) {
+          next(new Error("FORBIDDEN"));
+          return;
+        }
+        next();
+      })
+      .catch(() => next(new Error("UNAUTHENTICATED")));
   });
 
   io.on("connection", (socket) => {
@@ -20,26 +46,6 @@ export function initSocketServer(httpServer: HttpServer): SocketIOServer {
       logger.info({ socketId: socket.id, reason }, "Socket.IO client disconnected");
     });
   });
-
-  // Emit periodic aggregate analytics updates every 15 seconds
-  setInterval(() => {
-    if (io) {
-      const payload = {
-        timestamp: new Date().toISOString(),
-        eventType: "AGGREGATE_REFRESH",
-        summaryMessage: "Live public-health aggregate surveillance dataset updated.",
-        affectedRegions: ["Maharashtra", "Delhi NCR"],
-        aggregateDelta: {
-          category: "Respiratory",
-          casesCount: 1940,
-          suppressed: false,
-        },
-      };
-
-      io.emit("analytics:update", payload);
-      logger.info("Emitted analytics:update to connected clients");
-    }
-  }, 15000);
 
   return io;
 }

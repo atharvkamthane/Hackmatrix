@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import { createReadinessRouter } from "./readiness";
-import adminRouter from "./admin";
+import { createAdminAnalyticsRouter } from "./admin-analytics";
+import { createClinicalRouter } from "./clinical";
 import type { DatabaseConnections } from "../db";
 import {
   createAuthMiddleware,
@@ -21,14 +22,22 @@ export function createApiRouter(
 
   router.use(healthRouter);
   router.use(createReadinessRouter(connections));
-  router.use("/admin", adminRouter);
-
   const auth = createAuthMiddleware(verifyClerkRequest, findInternalUser);
+  router.use("/admin", auth, requireRole("ADMIN"), createAdminAnalyticsRouter(connections));
+  router.use(createClinicalRouter(connections, auth));
+
   router.get("/auth/me", auth, requireAuth(), (req, res) => {
+    const capabilities = {
+      PATIENT: ["clinical:read:self", "consent:manage:self", "qr:create:self"],
+      CLINICIAN: ["clinical:read:granted", "clinical:write:granted", "access:request"],
+      ADMIN: ["analytics:read", "audit:read", "security:read"],
+    } as const;
+    const role = req.auth?.role;
     res.json({
       userId: req.auth?.userId,
-      role: req.auth?.role,
+      role,
       organizationId: req.auth?.organizationId,
+      capabilities: role ? capabilities[role] : [],
     });
   });
   router.get("/auth/test/patient", auth, requireRole("PATIENT"), (_req, res) => {

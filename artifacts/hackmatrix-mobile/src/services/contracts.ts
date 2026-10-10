@@ -45,9 +45,9 @@ export interface ClinicianService {
   resolveQrToken(opaqueToken: string): Promise<AccessRequest>;
   getAccessRequest(id: string): Promise<AccessRequest | null>;
   getAuthorizedPatient(patientId: string): Promise<AuthorizedPatient | null>;
-  createEncounter(input: Pick<Encounter, 'diagnosis' | 'reason' | 'date'>): Promise<Encounter>;
-  createPrescription(input: Pick<Prescription, 'drug' | 'dose' | 'frequency' | 'start' | 'end'>): Promise<Prescription>;
-  createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'>): Promise<Observation>;
+  createEncounter(input: Pick<Encounter, 'diagnosis' | 'reason' | 'date'> & { patientId: string }): Promise<Encounter>;
+  createPrescription(input: Pick<Prescription, 'drug' | 'dose' | 'frequency' | 'start' | 'end'> & { patientId: string }): Promise<Prescription>;
+  createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'> & { patientId: string }): Promise<Observation>;
 }
 
 export interface RealtimeService {
