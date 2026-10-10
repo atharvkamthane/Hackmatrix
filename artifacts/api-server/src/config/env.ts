@@ -13,6 +13,11 @@ const environmentSchema = z
     CORS_ORIGINS: z.string().trim().min(1).optional(),
     LOG_LEVEL: z.string().default("info"),
     BODY_LIMIT: z.string().default("1mb"),
+    K_THRESHOLD: z.coerce.number().int().positive().default(10),
+    CLINICAL_MONGODB_URI: z.string().trim().min(1).optional(),
+    ANALYTICS_MONGODB_URI: z.string().trim().min(1).optional(),
+    ETL_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+    ETL_ENABLED: z.coerce.boolean().default(true),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === "production" && !value.MONGODB_URI) {

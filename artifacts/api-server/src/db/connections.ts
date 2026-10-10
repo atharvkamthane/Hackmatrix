@@ -20,24 +20,57 @@ export interface DatabaseConnections {
  * isolation. Production deployments need separately scoped MongoDB users/custom roles and
  * a controlled aggregate ingestion process before treating the data planes as isolated.
  */
+export interface DatabasePrivilegeReport {
+  isDistinctUri: boolean;
+  clinicalPlane: string;
+  analyticsPlane: string;
+  description: string;
+}
+
 export function createDatabaseConnections(config: AppConfig): DatabaseConnections {
-  if (!config.MONGODB_URI) {
-    throw new Error("MONGODB_URI is required to create database connections.");
+  const clinicalUri = config.CLINICAL_MONGODB_URI || config.MONGODB_URI;
+  const analyticsUri = config.ANALYTICS_MONGODB_URI || config.MONGODB_URI;
+
+  if (!clinicalUri || !analyticsUri) {
+    throw new Error("MONGODB_URI (or CLINICAL_MONGODB_URI and ANALYTICS_MONGODB_URI) is required to create database connections.");
   }
 
-  const clinical = mongoose.createConnection(config.MONGODB_URI, {
+  const clinical = mongoose.createConnection(clinicalUri, {
     dbName: config.MONGODB_DATABASE,
     serverSelectionTimeoutMS: 5_000,
   });
   (clinical as unknown as { plane: string }).plane = "clinical";
 
-  const analytics = mongoose.createConnection(config.MONGODB_URI, {
+  const analytics = mongoose.createConnection(analyticsUri, {
     dbName: config.MONGODB_DATABASE,
     serverSelectionTimeoutMS: 5_000,
   });
   (analytics as unknown as { plane: string }).plane = "analytics";
 
   return { clinical, analytics };
+}
+
+export function getDatabasePrivilegeReport(
+  connections: DatabaseConnections | undefined,
+): DatabasePrivilegeReport {
+  if (!connections) {
+    return {
+      isDistinctUri: false,
+      clinicalPlane: "disconnected",
+      analyticsPlane: "disconnected",
+      description: "Databases are not currently connected.",
+    };
+  }
+  const isDistinct = connections.clinical.host !== connections.analytics.host ||
+    connections.clinical.port !== connections.analytics.port;
+  return {
+    isDistinctUri: isDistinct,
+    clinicalPlane: "clinical",
+    analyticsPlane: "analytics",
+    description: isDistinct
+      ? "Clinical and analytics planes connect to distinct database hosts/roles (full privilege isolation)."
+      : "Clinical and analytics share database host credentials in development mode (logical collection boundary enforced by Mongoose plane guards).",
+  };
 }
 
 export async function connectDatabases(

@@ -37,6 +37,7 @@ async function startServer(): Promise<void> {
   let models: ReturnType<typeof createClinicalModels> | undefined;
   let analyticsModels: ReturnType<typeof createAnalyticsModels> | undefined;
   let server: http.Server | undefined;
+  let etlEngine: { start: () => Promise<void>; stop: () => Promise<void> } | undefined;
 
   try {
     if (config.MONGODB_URI) {
@@ -59,6 +60,8 @@ async function startServer(): Promise<void> {
           models.AccessGrant.createIndexes(),
           models.AuditLog.createIndexes(),
           analyticsModels.SurveillanceAggregate.createIndexes(),
+          analyticsModels.EtlCheckpoint.createIndexes(),
+          analyticsModels.EtlLedger.createIndexes(),
           connections.analytics.collection("auditLogs").createIndex({ occurredAt: -1 }),
         ]);
         logger.info("MongoDB connected and indexes verified");
@@ -66,13 +69,57 @@ async function startServer(): Promise<void> {
         if (config.NODE_ENV === "production") {
           throw dbErr;
         }
-        logger.warn(
-          { error: dbErr instanceof Error ? dbErr.message : String(dbErr) },
-          "MongoDB connection failed; starting server in degraded mode without database",
-        );
-        if (connections) {
-          await database.disconnectDatabases(connections).catch(() => undefined);
-          connections = undefined;
+        if (config.MONGODB_URI && !config.MONGODB_URI.includes("127.0.0.1") && !config.MONGODB_URI.includes("localhost")) {
+          try {
+            logger.warn("Primary MongoDB connection failed; attempting fallback to local MongoDB (127.0.0.1:27017)...");
+            const localConfig = {
+              ...config,
+              MONGODB_URI: "mongodb://127.0.0.1:27017",
+              CLINICAL_MONGODB_URI: undefined,
+              ANALYTICS_MONGODB_URI: undefined,
+            };
+            connections = database.createDatabaseConnections(localConfig);
+            await database.connectDatabases(connections);
+            models = createClinicalModels(connections.clinical);
+            analyticsModels = createAnalyticsModels(connections.analytics);
+            await Promise.all([
+              models.User.createIndexes(),
+              models.Organization.createIndexes(),
+              models.Patient.createIndexes(),
+              models.Clinician.createIndexes(),
+              models.Encounter.createIndexes(),
+              models.Condition.createIndexes(),
+              models.MedicationRequest.createIndexes(),
+              models.Observation.createIndexes(),
+              models.QRToken.createIndexes(),
+              models.AccessRequest.createIndexes(),
+              models.AccessGrant.createIndexes(),
+              models.AuditLog.createIndexes(),
+              analyticsModels.SurveillanceAggregate.createIndexes(),
+              analyticsModels.EtlCheckpoint.createIndexes(),
+              analyticsModels.EtlLedger.createIndexes(),
+              connections.analytics.collection("auditLogs").createIndex({ occurredAt: -1 }),
+            ]);
+            logger.info("Connected to local MongoDB fallback and verified indexes");
+          } catch {
+            logger.warn(
+              { error: dbErr instanceof Error ? dbErr.message : String(dbErr) },
+              "MongoDB connection failed; starting server in degraded mode without database",
+            );
+            if (connections) {
+              await database.disconnectDatabases(connections).catch(() => undefined);
+              connections = undefined;
+            }
+          }
+        } else {
+          logger.warn(
+            { error: dbErr instanceof Error ? dbErr.message : String(dbErr) },
+            "MongoDB connection failed; starting server in degraded mode without database",
+          );
+          if (connections) {
+            await database.disconnectDatabases(connections).catch(() => undefined);
+            connections = undefined;
+          }
         }
       }
     } else {
@@ -123,6 +170,23 @@ async function startServer(): Promise<void> {
     });
     logger.info({ port: config.PORT }, "HackMatrix API Server listening with Socket.IO enabled");
 
+    if (connections && config.ETL_ENABLED) {
+      const { EtlEngine } = await import("./etl");
+      const { getSocketServer } = await import("./socket");
+      etlEngine = new EtlEngine(connections, config, (affectedBuckets) => {
+        const socketServer = getSocketServer();
+        if (socketServer) {
+          socketServer.emit("analytics:update", {
+            timestamp: new Date().toISOString(),
+            eventType: "AGGREGATE_REFRESH",
+            summaryMessage: `Surveillance aggregates refreshed for ${affectedBuckets.length} cohort(s).`,
+            affectedRegions: [...new Set(affectedBuckets.map((b) => b.regionId))],
+          });
+        }
+      });
+      await etlEngine.start();
+    }
+
     if (connections) {
       for (const [name, connection] of [["clinical", connections.clinical], ["analytics", connections.analytics]] as const) {
         connection.on("error", () => logger.error({ connection: name }, "MongoDB connection error"));
@@ -137,6 +201,9 @@ async function startServer(): Promise<void> {
       shuttingDown = true;
       void (async () => {
         try {
+          if (etlEngine) {
+            await etlEngine.stop();
+          }
           await new Promise<void>((resolve, reject) => {
             server?.close((error) => error ? reject(error) : resolve());
           });
@@ -155,6 +222,9 @@ async function startServer(): Promise<void> {
   } catch (error) {
     if (server?.listening) {
       await new Promise<void>((resolve) => server?.close(() => resolve()));
+    }
+    if (etlEngine) {
+      await etlEngine.stop().catch(() => undefined);
     }
     if (connections) {
       await database.disconnectDatabases(connections).catch(() => undefined);

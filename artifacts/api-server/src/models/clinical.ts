@@ -52,6 +52,9 @@ const organizationSchema = new Schema(
     clerkOrganizationId: { type: String, unique: true, sparse: true, trim: true },
     name: { type: String, required: true, trim: true },
     status: { type: String, enum: ["active", "disabled"], default: "active" },
+    regionId: { type: String, trim: true, maxlength: 80 },
+    stateName: { type: String, trim: true, maxlength: 80 },
+    districtName: { type: String, trim: true, maxlength: 80 },
   },
   { timestamps: true, collection: "organizations" },
 );
