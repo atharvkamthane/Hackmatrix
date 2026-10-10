@@ -58,10 +58,21 @@ const PRESET_PERSONAS: Persona[] = [
 ];
 
 function extractClerkErrorMessage(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'errors' in err) {
-    const clerkErr = err as { errors?: Array<{ message?: string; longMessage?: string }> };
-    if (clerkErr.errors?.[0]) {
-      return clerkErr.errors[0].longMessage || clerkErr.errors[0].message || 'Sign-in failed.';
+  if (typeof err === 'string' && err.trim()) {
+    return err;
+  }
+  if (typeof err === 'object' && err !== null) {
+    if ('longMessage' in err && typeof (err as any).longMessage === 'string' && (err as any).longMessage) {
+      return (err as any).longMessage;
+    }
+    if ('errors' in err && Array.isArray((err as any).errors)) {
+      const firstErr = (err as any).errors[0];
+      if (firstErr) {
+        return firstErr.longMessage || firstErr.message || 'Authentication request failed.';
+      }
+    }
+    if ('message' in err && typeof (err as any).message === 'string' && (err as any).message) {
+      return (err as any).message;
     }
   }
   return err instanceof Error ? err.message : 'Invalid credentials or Clerk authentication failed.';
@@ -450,6 +461,11 @@ export function LoginScreen() {
         },
       });
 
+      if (result?.error) {
+        setClerkError(extractClerkErrorMessage(result.error));
+        return;
+      }
+
       const currentStatus = result?.status || activeSignUp?.status;
       const currentSessionId = result?.createdSessionId || activeSignUp?.createdSessionId;
       const unverified = result?.unverifiedFields || activeSignUp?.unverifiedFields;
@@ -510,6 +526,11 @@ export function LoginScreen() {
         completeSignUp = await activeSignUp.verifications.verifyEmailCode({
           code: signUpCode.trim(),
         });
+      }
+
+      if (completeSignUp?.error) {
+        setClerkError(extractClerkErrorMessage(completeSignUp.error));
+        return;
       }
 
       const currentStatus = completeSignUp?.status || activeSignUp?.status;
