@@ -40,13 +40,26 @@ export function Screen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { role, switchDemoRole, isDemoMode } = useAppContext();
+  const { role, switchDemoRole, isDemoMode, signOut } = useAppContext();
   const router = useRouter();
   const webTop = Platform.OS === 'web' ? 67 : 10;
   const bottomSpace = Platform.OS === 'web' ? 110 : 104 + insets.bottom;
+  const [signingOut, setSigningOut] = React.useState(false);
   const handleRoleSwitch = async () => {
     await switchDemoRole();
     router.replace((role === 'patient' ? '/(clinician)/(tabs)' : '/(patient)/(tabs)') as never);
+  };
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace('/' as never);
+    } catch {
+      // Handled by context
+    } finally {
+      setSigningOut(false);
+    }
   };
   const body = (
     <View style={[styles.content, { paddingTop: insets.top + webTop, paddingBottom: bottomSpace }, contentStyle]}>
@@ -72,25 +85,46 @@ export function Screen({
               <Text style={[styles.badgeText, { color: colors.warning }]}>DEMO</Text>
             </View>
           ) : (
-            <View style={[styles.badge, { backgroundColor: colors.successSurface }]}>
-              <Text style={[styles.badgeText, { color: colors.success }]}>VERIFIED</Text>
+            <View style={[styles.badge, { backgroundColor: colors.infoSurface }]}>
+              <Text style={[styles.badgeText, { color: colors.info }]}>LIVE</Text>
             </View>
           )}
         </View>
-        {showRoleSwitch && isDemoMode && role ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Switch from ${role} demo role`}
-            onPress={() => void handleRoleSwitch()}
-            testID="switch-demo-role"
-            style={[styles.roleChip, { backgroundColor: colors.secondary }]}
-          >
-            <Feather name="repeat" size={13} color={colors.primary} />
-            <Text style={[styles.roleChipText, { color: colors.secondaryForeground }]}>
-              {role === 'patient' ? 'Patient' : 'Clinician'}
-            </Text>
-          </Pressable>
-        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {showRoleSwitch && isDemoMode && role ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Switch from ${role} demo role`}
+              onPress={() => void handleRoleSwitch()}
+              testID="switch-demo-role"
+              style={[styles.roleChip, { backgroundColor: colors.secondary }]}
+            >
+              <Feather name="repeat" size={13} color={colors.primary} />
+              <Text style={[styles.roleChipText, { color: colors.secondaryForeground }]}>
+                {role === 'patient' ? 'Patient' : 'Clinician'}
+              </Text>
+            </Pressable>
+          ) : null}
+          {role ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              disabled={signingOut}
+              onPress={() => void handleSignOut()}
+              testID="header-sign-out"
+              style={[styles.roleChip, { backgroundColor: colors.muted, opacity: signingOut ? 0.6 : 1 }]}
+            >
+              {signingOut ? (
+                <ActivityIndicator size={12} color={colors.foreground} />
+              ) : (
+                <Feather name="log-out" size={12} color={colors.foreground} />
+              )}
+              <Text style={[styles.roleChipText, { color: colors.foreground, fontWeight: '600' }]}>
+                {signingOut ? 'Exiting...' : 'Sign Out'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       {title ? (
         <View style={styles.heading}>
@@ -370,7 +404,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scrollContent: { flexGrow: 1 },
   content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 },
   brandLockup: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   brandIcon: { width: 29, height: 29, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 15, letterSpacing: 0.1 },

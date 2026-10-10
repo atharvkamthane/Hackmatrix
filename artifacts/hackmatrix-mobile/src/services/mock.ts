@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   AccessEvent,
   AccessScope,
+  DemoSession,
   DemoState,
   Encounter,
   Observation,
@@ -180,7 +181,11 @@ function activeGrant(state: DemoState) {
 async function requireRole(expected: Role) {
   const saved = await AsyncStorage.getItem(SESSION_KEY);
   const session = saved ? (JSON.parse(saved) as { role: Role }) : null;
-  if (session?.role !== expected) {
+  if (!session) {
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ role: expected }));
+    return;
+  }
+  if (session.role !== expected) {
     throw new Error(
       expected === 'patient'
         ? 'Switch to the patient demo role to access this feature.'
@@ -203,10 +208,34 @@ export const mockServices: HackMatrixServices = {
   auth: {
     async getSession() {
       const saved = await AsyncStorage.getItem(SESSION_KEY);
-      return saved ? (JSON.parse(saved) as { role: Role }) : null;
+      return saved ? (JSON.parse(saved) as DemoSession) : null;
     },
-    async signIn(role) {
-      const session = { role };
+    async signIn(role, customProfile) {
+      if (customProfile?.name) {
+        if (role === 'patient') {
+          await updateState((current) => ({
+            ...current,
+            patient: {
+              ...current.patient,
+              name: customProfile.name,
+              memberSince: new Date().getFullYear().toString(),
+            },
+            conditions: customProfile.detail
+              ? [
+                  {
+                    id: id('condition'),
+                    name: customProfile.detail,
+                    status: 'Active',
+                    since: new Date().getFullYear().toString(),
+                    note: 'Custom profile condition',
+                  },
+                  ...current.conditions,
+                ]
+              : current.conditions,
+          }));
+        }
+      }
+      const session: DemoSession = { role, name: customProfile?.name };
       await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
       return session;
     },
@@ -358,11 +387,13 @@ export const mockServices: HackMatrixServices = {
       ) {
         throw new Error('This QR token is invalid or expired. Ask the patient to refresh it.');
       }
+      const session = await mockServices.auth.getSession();
+      const clinicianName = session?.name || 'Dr. Maya Chen';
       const request = {
         id: id('request'),
         patientId: DEMO_PATIENT_ID,
         clinicianId: DEMO_CLINICIAN_ID,
-        clinicianName: 'Dr. Maya Chen',
+        clinicianName,
         organization: 'Harbor Health Clinic',
         scopes: ['Conditions', 'Encounters', 'Prescriptions'] as AccessScope[],
         durationMinutes: 60,
