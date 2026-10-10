@@ -1,12 +1,14 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth as useClerkAuth, useUser } from '@clerk/react';
 import { apiClient, setAuthTokenProvider } from '../services/apiClient';
+import { isDemoMode, setDemoMode } from '../services/adminService';
 
 export interface AdminUser {
   id: string;
   name: string;
   email: string;
   role: 'ADMIN';
+  isDemo?: boolean;
 }
 
 interface AuthContextType {
@@ -17,6 +19,8 @@ interface AuthContextType {
   error: string | null;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
+  enterDemoMode: () => void;
+  isDemo: boolean;
 }
 
 interface ServerIdentity {
@@ -27,20 +31,85 @@ interface ServerIdentity {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { isLoaded, isSignedIn, getToken: clerkGetToken, signOut } = useClerkAuth();
   const { user: clerkUser } = useUser();
-  const [user, setUser] = useState<AdminUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [demoActive, setDemoActive] = useState<boolean>(() => isDemoMode());
+  const [user, setUser] = useState<AdminUser | null>(() => {
+    if (isDemoMode()) {
+      return {
+        id: 'admin_demo_01',
+        name: 'Demo Administrator',
+        email: 'admin@hackmatrix.local',
+        role: 'ADMIN',
+        isDemo: true,
+      };
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => !isDemoMode());
   const [error, setError] = useState<string | null>(null);
 
+  const enterDemoMode = useCallback(() => {
+    setDemoMode(true);
+    localStorage.setItem('hm_demo_mode', 'true');
+    setDemoActive(true);
+    setUser({
+      id: 'admin_demo_01',
+      name: 'Demo Administrator',
+      email: 'admin@hackmatrix.local',
+      role: 'ADMIN',
+      isDemo: true,
+    });
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
+  const logout = useCallback(async () => {
+    setDemoMode(false);
+    localStorage.removeItem('hm_demo_mode');
+    setDemoActive(false);
+    setUser(null);
+    setError(null);
+    if (isSignedIn) {
+      await signOut();
+    }
+  }, [isSignedIn, signOut]);
+
+  const getToken = useCallback(async (): Promise<string | null> => {
+    if (demoActive) return 'demo_token';
+    try {
+      return (await clerkGetToken()) ?? null;
+    } catch {
+      return null;
+    }
+  }, [clerkGetToken, demoActive]);
+
   useEffect(() => {
+    if (demoActive) {
+      setIsLoading(false);
+      return;
+    }
+
     setAuthTokenProvider(isSignedIn ? getToken : null);
     let active = true;
 
-    if (!isLoaded || !isSignedIn) {
+    if (!isLoaded) {
+      const timeout = setTimeout(() => {
+        if (active) {
+          setIsLoading(false);
+          setError('Authentication service took too long to respond. You can retry or use Demo Mode.');
+        }
+      }, 5000);
+      return () => {
+        active = false;
+        clearTimeout(timeout);
+      };
+    }
+
+    if (!isSignedIn) {
       setUser(null);
       setError(null);
-      setIsLoading(!isLoaded);
+      setIsLoading(false);
       return () => {
         active = false;
         setAuthTokenProvider(null);
@@ -77,17 +146,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       active = false;
       setAuthTokenProvider(null);
     };
-  }, [clerkUser, getToken, isLoaded, isSignedIn]);
+  }, [clerkUser, demoActive, getToken, isLoaded, isSignedIn]);
 
   const value = useMemo<AuthContextType>(() => ({
     user,
     isAuthenticated: user !== null,
-    isSignedIn: Boolean(isSignedIn),
+    isSignedIn: Boolean(isSignedIn || demoActive),
     isLoading,
     error,
-    logout: signOut,
+    logout,
     getToken,
-  }), [error, getToken, isLoading, isSignedIn, signOut, user]);
+    enterDemoMode,
+    isDemo: demoActive,
+  }), [demoActive, enterDemoMode, error, getToken, isLoading, isSignedIn, logout, user]);
 
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
