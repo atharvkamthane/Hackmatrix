@@ -83,7 +83,7 @@ function RequestStatusCard({ request, onOpen }: { request: AccessRequest; onOpen
 export function ClinicianHomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { data, refresh } = useAppContext();
+  const { data, refresh, userName } = useAppContext();
   const [authorized, setAuthorized] = useState<AuthorizedPatient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,8 +108,12 @@ export function ClinicianHomeScreen() {
   );
   const pending = myRequests.find((request) => request.status === 'pending');
 
+  const clinicianGreeting = userName
+    ? (userName.startsWith('Dr.') ? `Good morning, ${userName}` : `Good morning, Dr. ${userName}`)
+    : 'Good morning, Dr. Chen';
+
   return (
-    <Screen title="Good morning, Dr. Chen" subtitle="Your clinical workspace, with patient consent at the center.">
+    <Screen title={clinicianGreeting} subtitle="Your clinical workspace, with patient consent at the center.">
       <Card style={styles.clinicianHero}>
         <View style={[styles.clinicianHeroIcon, { backgroundColor: colors.infoSurface }]}>
           <Feather name="briefcase" size={19} color={colors.info} />
