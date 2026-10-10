@@ -19,8 +19,20 @@ interface ApiErrorBody {
  * request time, so callers cannot supply or persist their own bearer token.
  */
 export async function apiFetch(path: string, init: RequestInit = {}) {
-  const token = await getClerkInstance().session?.getToken();
-  if (!token) throw new Error('Your session has expired. Please sign in again.');
+  let clerk;
+  try {
+    clerk = getClerkInstance();
+  } catch {
+    throw new Error('Clerk authentication is not configured in this mobile client.');
+  }
+  const session = clerk?.session;
+  if (!session) {
+    throw new Error('No active Clerk session found. Please sign in with your credentials.');
+  }
+  const token = await session.getToken();
+  if (!token) {
+    throw new Error('Unable to obtain Clerk authorization token. Please sign in again.');
+  }
 
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);

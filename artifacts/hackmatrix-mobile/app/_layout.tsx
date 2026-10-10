@@ -15,10 +15,14 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { ClerkProvider } from '@clerk/expo';
+import { tokenCache } from '@/src/auth/tokenCache';
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 function RootLayoutNav() {
   return (
@@ -47,15 +51,25 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  const content = (
+    <AppProvider>
+      <RootLayoutNav />
+    </AppProvider>
+  );
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              <AppProvider>
-                <RootLayoutNav />
-              </AppProvider>
+              {clerkPublishableKey ? (
+                <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+                  {content}
+                </ClerkProvider>
+              ) : (
+                content
+              )}
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

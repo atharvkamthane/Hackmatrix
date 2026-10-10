@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
-import mongoose from "mongoose";
+import mongoose, { type Connection } from "mongoose";
 import {
   createClinicalModels,
   clinicalScopes,
 } from "./clinical";
+import {
+  cleanupSeededRecords,
+  SEED_ORGANIZATION_CLERK_IDS,
+  SEED_USER_CLERK_IDS,
+} from "./seed-cleanup";
 
 const connection = mongoose.createConnection();
+(connection as unknown as { plane: string }).plane = "clinical";
 const models = createClinicalModels(connection);
 const organizationId = new mongoose.Types.ObjectId();
 const userId = new mongoose.Types.ObjectId();
@@ -84,7 +92,7 @@ test("QR tokens store hashes and enforce unique hash lookup indexes", () => {
 
   assert.equal(token.validateSync(), undefined);
   assert.equal(token.tokenHash.length, 64);
-  assert.ok(models.QRToken.schema.indexes().some(([fields, options]) =>
+  assert.ok(models.QRToken.schema.indexes().some(([fields, options]: any[]) =>
     fields.tokenHash === 1 && fields.expiresAt === 1 && options?.unique === true,
   ));
 });
@@ -103,5 +111,98 @@ test("audit logs contain metadata only and index by timestamp", () => {
 
   assert.equal(audit.validateSync(), undefined);
   assert.equal("clinicalPayload" in audit.toObject(), false);
-  assert.ok(models.AuditLog.schema.indexes().some(([fields]) => fields.occurredAt === -1));
+  assert.ok(models.AuditLog.schema.indexes().some(([fields]: any[]) => fields.occurredAt === -1));
 });
+
+test("cannot register clinical models on an analytics connection plane", async () => {
+  const analyticsConn = mongoose.createConnection();
+  (analyticsConn as unknown as { plane: string }).plane = "analytics";
+  try {
+    assert.throws(
+      () => createClinicalModels(analyticsConn),
+      /Cannot register clinical models on analytics connection\. Clinical models are restricted to the clinical data plane\./,
+    );
+  } finally {
+    await analyticsConn.close();
+  }
+});
+
+test("cannot register clinical models on a connection with analytics in dbName", async () => {
+  const analyticsConn = mongoose.createConnection();
+  Object.defineProperty(analyticsConn, "name", { value: "hackmatrix_analytics" });
+  try {
+    assert.throws(
+      () => createClinicalModels(analyticsConn),
+      /Cannot register clinical models on analytics connection\. Clinical models are restricted to the clinical data plane\./,
+    );
+  } finally {
+    await analyticsConn.close();
+  }
+});
+
+test("admin analytics route module does not import clinical models", () => {
+  const adminRoutePath = path.resolve(process.cwd(), "src/routes/admin.ts");
+  const adminContent = fs.readFileSync(adminRoutePath, "utf8");
+  assert.equal(
+    adminContent.includes("models/clinical"),
+    false,
+    "admin.ts must not import clinical models directly",
+  );
+});
+
+test("seed cleanup targets only seed-owned records and preserves unrelated records", async () => {
+  const deleteCalls: Record<string, any[]> = {};
+  const mockModels: any = {
+    Organization: {
+      find: (filter: any) => ({
+        select: async () => [{ _id: "seed_org_1" }],
+      }),
+      deleteMany: async (filter: any) => { deleteCalls.Organization = filter; },
+    },
+    User: {
+      find: (filter: any) => ({
+        select: async () => [{ _id: "seed_user_1" }],
+      }),
+      deleteMany: async (filter: any) => { deleteCalls.User = filter; },
+    },
+    Patient: {
+      find: (filter: any) => ({
+        select: async () => [{ _id: "seed_patient_1" }],
+      }),
+      deleteMany: async (filter: any) => { deleteCalls.Patient = filter; },
+    },
+    Clinician: {
+      find: (filter: any) => ({
+        select: async () => [{ _id: "seed_clinician_1" }],
+      }),
+      deleteMany: async (filter: any) => { deleteCalls.Clinician = filter; },
+    },
+    Encounter: {
+      deleteMany: async (filter: any) => { deleteCalls.Encounter = filter; },
+    },
+    Condition: {
+      deleteMany: async (filter: any) => { deleteCalls.Condition = filter; },
+    },
+    MedicationRequest: {
+      deleteMany: async (filter: any) => { deleteCalls.MedicationRequest = filter; },
+    },
+    Observation: {
+      deleteMany: async (filter: any) => { deleteCalls.Observation = filter; },
+    },
+    AuditLog: {
+      deleteMany: async (filter: any) => { deleteCalls.AuditLog = filter; },
+    },
+  };
+
+  await cleanupSeededRecords(mockModels);
+
+  // Assert cleanup used specific IDs rather than broad regex like /^Synthetic/
+  assert.deepEqual(deleteCalls.Patient, { _id: { $in: ["seed_patient_1"] } });
+  assert.deepEqual(deleteCalls.Clinician, { _id: { $in: ["seed_clinician_1"] } });
+  assert.deepEqual(deleteCalls.Encounter, { patientId: { $in: ["seed_patient_1"] } });
+  assert.deepEqual(deleteCalls.Condition, { patientId: { $in: ["seed_patient_1"] } });
+  assert.deepEqual(deleteCalls.MedicationRequest, { patientId: { $in: ["seed_patient_1"] } });
+  assert.deepEqual(deleteCalls.Observation, { patientId: { $in: ["seed_patient_1"] } });
+  assert.deepEqual(deleteCalls.AuditLog, { actorUserId: { $in: [...SEED_USER_CLERK_IDS] } });
+});
+

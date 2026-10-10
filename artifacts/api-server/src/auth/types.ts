@@ -14,6 +14,18 @@ export interface VerifiedClerkIdentity {
   organizationId: string | null;
 }
 
+export interface InternalUserRecord {
+  clerkUserId: string;
+  role: Role;
+  organizationId: string | null;
+  status: "active" | "disabled";
+}
+
+export type FindInternalUser = (
+  clerkUserId: string,
+) => Promise<InternalUserRecord | null>;
+
 export function isRole(value: unknown): value is Role {
   return typeof value === "string" && roles.includes(value as Role);
 }
+

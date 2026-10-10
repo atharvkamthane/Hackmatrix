@@ -2,7 +2,8 @@ import { createClerkClient } from "@clerk/backend";
 import type { Request, RequestHandler } from "express";
 import type { AppConfig } from "../config/env";
 import { normalizeIdentity } from "./role-resolution";
-import type { AuthenticatedUser, VerifiedClerkIdentity } from "./types";
+import type { AuthenticatedUser, FindInternalUser, VerifiedClerkIdentity } from "./types";
+import { isRole } from "./types";
 
 export type VerifyClerkRequest = (
   req: Request,
@@ -42,16 +43,8 @@ export function createClerkVerifier(config: AppConfig): VerifyClerkRequest {
     if (!requestState.isAuthenticated) return null;
 
     const auth = requestState.toAuth();
-    const claims = auth.sessionClaims as Record<string, unknown>;
-    let roleClaim = readClaim(claims, config.CLERK_ROLE_CLAIM);
-    if (!roleClaim && auth.userId) {
-      try {
-        const user = await clerkClient.users.getUser(auth.userId);
-        roleClaim = (user.publicMetadata as Record<string, unknown>)?.role;
-      } catch {
-        // Fallback: role remains unassigned if not found
-      }
-    }
+    const claims = (auth.sessionClaims ?? {}) as Record<string, unknown>;
+    const roleClaim = readClaim(claims, config.CLERK_ROLE_CLAIM);
     return {
       userId: auth.userId,
       roleClaim,
@@ -62,6 +55,7 @@ export function createClerkVerifier(config: AppConfig): VerifyClerkRequest {
 
 export function createAuthMiddleware(
   verify: VerifyClerkRequest,
+  findUser?: FindInternalUser,
 ): RequestHandler {
   return async (req, res, next) => {
     try {
@@ -76,17 +70,57 @@ export function createAuthMiddleware(
         });
         return;
       }
-      try {
-        req.auth = normalizeIdentity(verified);
-      } catch {
-        res.status(403).json({
-          error: {
-            code: "ROLE_NOT_ASSIGNED",
-            message: "The authenticated user does not have a valid server-assigned role.",
-            requestId: req.requestId,
-          },
-        });
-        return;
+
+      if (findUser) {
+        const internalUser = await findUser(verified.userId);
+        if (!internalUser) {
+          res.status(403).json({
+            error: {
+              code: "USER_NOT_PROVISIONED",
+              message: "The authenticated identity has no internal account mapping.",
+              requestId: req.requestId,
+            },
+          });
+          return;
+        }
+        if (internalUser.status === "disabled") {
+          res.status(403).json({
+            error: {
+              code: "ACCOUNT_DISABLED",
+              message: "The internal account is disabled.",
+              requestId: req.requestId,
+            },
+          });
+          return;
+        }
+        if (!isRole(internalUser.role)) {
+          res.status(403).json({
+            error: {
+              code: "ROLE_NOT_ASSIGNED",
+              message: "The authenticated user does not have a valid server-assigned role.",
+              requestId: req.requestId,
+            },
+          });
+          return;
+        }
+        req.auth = {
+          userId: internalUser.clerkUserId,
+          role: internalUser.role,
+          organizationId: internalUser.organizationId,
+        };
+      } else {
+        try {
+          req.auth = normalizeIdentity(verified);
+        } catch {
+          res.status(403).json({
+            error: {
+              code: "ROLE_NOT_ASSIGNED",
+              message: "The authenticated user does not have a valid server-assigned role.",
+              requestId: req.requestId,
+            },
+          });
+          return;
+        }
       }
       next();
     } catch (error) {

@@ -157,3 +157,6 @@ overrides:
 
 allowBuilds:
   esbuild: true
+  core-js: true
+  '@clerk/shared': true
+  browser-tabs-lock: true
