@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { LogBox, StyleSheet, Text, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -18,6 +18,12 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { ClerkProvider } from '@clerk/expo';
 import { tokenCache } from '@/src/auth/tokenCache';
+
+// Suppress known non-fatal development notices from overlaying LogBox in Expo
+LogBox.ignoreLogs([
+  'Clerk: Clerk has been loaded with development keys',
+  '"shadow*" style props are deprecated',
+]);
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
