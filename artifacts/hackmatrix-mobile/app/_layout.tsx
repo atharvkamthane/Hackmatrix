@@ -17,7 +17,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { ClerkProvider } from '@clerk/expo';
-import { tokenCache } from '@/src/auth/tokenCache';
+import { tokenCache } from '@clerk/expo/token-cache';
 
 // Suppress known non-fatal development notices from overlaying LogBox in Expo
 LogBox.ignoreLogs([
