@@ -115,6 +115,7 @@ export interface AuthorizedPatient {
 
 export interface DemoSession {
   role: Role;
+  name?: string;
 }
 
 export interface AccessEvent {

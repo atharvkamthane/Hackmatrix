@@ -133,11 +133,15 @@ function GrantCard({ grant, onRevoke }: { grant: AccessGrant; onRevoke: () => vo
 export function PatientHomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { data, error, refresh, isDemoMode } = useAppContext();
+  const { data, error, refresh, isDemoMode, signOut } = useAppContext();
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [records, setRecords] = useState<Pick<DemoState, 'conditions' | 'encounters' | 'prescriptions' | 'observations'> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const [profile, patientRecords] = await Promise.all([
         services.patient.getMe(),
@@ -145,9 +149,12 @@ export function PatientHomeScreen() {
       ]);
       setPatient(profile);
       setRecords(patientRecords);
-    } catch {
+    } catch (err: unknown) {
       setPatient(null);
       setRecords(null);
+      setLoadError(err instanceof Error ? err.message : 'Unable to load health summary.');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -163,9 +170,54 @@ export function PatientHomeScreen() {
 
   return (
     <Screen title={patient ? `Good morning, ${patient.name.split(' ')[0]}` : 'Your health overview'} subtitle="Your care, organized around you.">
-      {error ? <InfoBanner title={isDemoMode ? 'Demo data could not load' : 'Health data could not load'} body={error} tone="warning" icon="alert-circle" /> : null}
-      {!records ? (
-        <Card><ActivityIndicator color={colors.primary} /><Text style={[itemStyles.caption, { color: colors.mutedForeground, textAlign: 'center', marginTop: 10 }]}>Loading your health summary…</Text></Card>
+      {error ? (
+        <InfoBanner
+          title={isDemoMode ? 'Demo data could not load' : 'Health data could not load'}
+          body={error}
+          tone="warning"
+          icon="alert-circle"
+        />
+      ) : null}
+      {loading ? (
+        <Card>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[itemStyles.caption, { color: colors.mutedForeground, textAlign: 'center', marginTop: 10 }]}>
+            Loading your health summary…
+          </Text>
+        </Card>
+      ) : loadError ? (
+        <Card style={{ gap: 12 }}>
+          <InfoBanner title="Summary Unavailable" body={loadError} tone="warning" icon="alert-circle" />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Button label="Retry" onPress={() => void load()} icon="refresh-cw" variant="outline" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Sign out"
+                onPress={async () => {
+                  await signOut();
+                  router.replace('/' as never);
+                }}
+                variant="secondary"
+              />
+            </View>
+          </View>
+        </Card>
+      ) : !records ? (
+        <Card style={{ gap: 12 }}>
+          <Text style={[itemStyles.caption, { color: colors.mutedForeground, textAlign: 'center' }]}>
+            No health records found.
+          </Text>
+          <Button
+            label="Sign out / Return to Login"
+            onPress={async () => {
+              await signOut();
+              router.replace('/' as never);
+            }}
+            variant="outline"
+          />
+        </Card>
       ) : (
         <>
           <Card style={styles.welcomeCard}>

@@ -18,7 +18,7 @@ import type {
 
 export interface AuthenticationService {
   getSession(): Promise<DemoSession | null>;
-  signIn(role: Role): Promise<DemoSession>;
+  signIn(role: Role, customProfile?: { name: string; detail?: string }): Promise<DemoSession>;
   signOut(): Promise<void>;
 }
 
