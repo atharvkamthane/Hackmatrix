@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useClerk } from '@clerk/expo';
+import { useClerk, useSignIn, useSignUp } from '@clerk/expo';
 import { Button, Card, Field, InfoBanner, RoleLabel } from '@/src/components/ui';
 import { useAppContext } from '@/src/context/AppContext';
 import { useColors } from '@/hooks/useColors';
@@ -72,6 +72,8 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const clerk = useClerk();
+  const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
   const { isReady, role, isUnprovisioned, provisionSelf, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
 
   // Top Tabs: Clerk Production vs Demo Sandbox
@@ -239,6 +241,14 @@ export function LoginScreen() {
     }
   };
 
+  const getActiveSignUp = () => {
+    return (signUp as any) || (clerk as any)?.client?.signUp || (clerk as any)?.signUp;
+  };
+
+  const getActiveSignIn = () => {
+    return (signIn as any) || (clerk as any)?.client?.signIn || (clerk as any)?.signIn;
+  };
+
   // Clerk: Sign In
   const handleClerkSignIn = async () => {
     clearError();
@@ -251,11 +261,17 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setClerkLoading(true);
     try {
       let result: any;
       try {
-        result = await clerk.client.signIn.create({
+        result = await activeSignIn.create({
           identifier: clerkEmail.trim(),
           password: clerkPassword,
         });
@@ -265,7 +281,11 @@ export function LoginScreen() {
           if (clerk.signOut) {
             await clerk.signOut();
           }
-          result = await clerk.client.signIn.create({
+          const retrySignIn = getActiveSignIn();
+          if (!retrySignIn) {
+            throw firstErr;
+          }
+          result = await retrySignIn.create({
             identifier: clerkEmail.trim(),
             password: clerkPassword,
           });
@@ -274,19 +294,22 @@ export function LoginScreen() {
         }
       }
 
-      if (result.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: result.createdSessionId });
+      const status = result?.status || activeSignIn?.status;
+      const createdSessionId = result?.createdSessionId || activeSignIn?.createdSessionId;
+
+      if (status === 'complete') {
+        if (createdSessionId && clerk.setActive) {
+          await clerk.setActive({ session: createdSessionId });
         }
         await signInProduction();
-      } else if (result.status === 'needs_client_trust' || result.status === 'needs_second_factor') {
-        const secondFactors = result.supportedSecondFactors || [];
+      } else if (status === 'needs_client_trust' || status === 'needs_second_factor') {
+        const secondFactors = result?.supportedSecondFactors || activeSignIn?.supportedSecondFactors || [];
         const emailFactor = secondFactors.find((f: any) => f.strategy === 'email_code');
         const target = emailFactor?.safeIdentifier || clerkEmail.trim();
         setVerificationTarget(target);
         setNeedsVerification(true);
       } else {
-        setClerkError(`Additional verification required: ${result.status}`);
+        setClerkError(`Additional verification required: ${status || 'unknown'}`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -307,17 +330,27 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and retry.');
+      return;
+    }
+
     setVerificationLoading(true);
     try {
       let completeResult: any;
       try {
-        completeResult = await clerk.client.signIn.attemptSecondFactor({
-          strategy: 'email_code',
-          code: verificationCode.trim(),
-        });
+        if (typeof activeSignIn.attemptSecondFactor === 'function') {
+          completeResult = await activeSignIn.attemptSecondFactor({
+            strategy: 'email_code',
+            code: verificationCode.trim(),
+          });
+        } else {
+          throw new Error('Second factor verification method not available.');
+        }
       } catch (secondFactorErr: any) {
-        if (typeof clerk.client.signIn.attemptFirstFactor === 'function') {
-          completeResult = await clerk.client.signIn.attemptFirstFactor({
+        if (typeof activeSignIn.attemptFirstFactor === 'function') {
+          completeResult = await activeSignIn.attemptFirstFactor({
             strategy: 'email_code',
             code: verificationCode.trim(),
           });
@@ -326,13 +359,16 @@ export function LoginScreen() {
         }
       }
 
-      if (completeResult?.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: completeResult.createdSessionId });
+      const status = completeResult?.status || activeSignIn?.status;
+      const createdSessionId = completeResult?.createdSessionId || activeSignIn?.createdSessionId;
+
+      if (status === 'complete') {
+        if (createdSessionId && clerk.setActive) {
+          await clerk.setActive({ session: createdSessionId });
         }
         await signInProduction();
       } else {
-        setClerkError(`Verification incomplete (${completeResult?.status || 'unknown'}). Please check code.`);
+        setClerkError(`Verification incomplete (${status || 'unknown'}). Please check code.`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -345,14 +381,21 @@ export function LoginScreen() {
   const handleResendCode = async () => {
     clearError();
     setClerkError(null);
+
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and retry.');
+      return;
+    }
+
     setVerificationLoading(true);
     try {
-      if (typeof clerk.client.signIn.prepareSecondFactor === 'function') {
-        await clerk.client.signIn.prepareSecondFactor({ strategy: 'email_code' });
-      } else if (typeof clerk.client.signIn.prepareFirstFactor === 'function') {
-        const factors = (clerk.client.signIn as any).supportedFirstFactors;
+      if (typeof activeSignIn.prepareSecondFactor === 'function') {
+        await activeSignIn.prepareSecondFactor({ strategy: 'email_code' });
+      } else if (typeof activeSignIn.prepareFirstFactor === 'function') {
+        const factors = (activeSignIn as any).supportedFirstFactors;
         const emailFactor = factors?.find((f: any) => f.strategy === 'email_code');
-        await (clerk.client.signIn as any).prepareFirstFactor({
+        await (activeSignIn as any).prepareFirstFactor({
           strategy: 'email_code',
           ...(emailFactor?.emailAddressId ? { emailAddressId: emailFactor.emailAddressId } : {}),
         });
@@ -381,6 +424,12 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignUp = getActiveSignUp();
+    if (!activeSignUp) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setSignUpLoading(true);
     try {
       if (clerk.session || clerk.user) {
@@ -391,7 +440,7 @@ export function LoginScreen() {
         }
       }
 
-      const signUp = await clerk.client.signUp.create({
+      const result = await activeSignUp.create({
         emailAddress: signUpEmail.trim(),
         password: signUpPassword,
         firstName: signUpFirstName.trim() || undefined,
@@ -401,9 +450,13 @@ export function LoginScreen() {
         },
       });
 
-      if (signUp.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: signUp.createdSessionId });
+      const currentStatus = result?.status || activeSignUp?.status;
+      const currentSessionId = result?.createdSessionId || activeSignUp?.createdSessionId;
+      const unverified = result?.unverifiedFields || activeSignUp?.unverifiedFields;
+
+      if (currentStatus === 'complete') {
+        if (currentSessionId && clerk.setActive) {
+          await clerk.setActive({ session: currentSessionId });
         }
         try {
           await signInProduction();
@@ -412,13 +465,17 @@ export function LoginScreen() {
             'Account Created: Your Clerk account is verified. HackMatrix production access requires server-side administrative provisioning before clinical access is granted.'
           );
         }
-      } else if (signUp.status === 'missing_requirements' || (signUp as any).unverifiedFields?.includes('email_address')) {
-        await clerk.client.signUp.prepareEmailAddressVerification({
-          strategy: 'email_code',
-        });
+      } else if (currentStatus === 'missing_requirements' || unverified?.includes('email_address') || !currentStatus || currentStatus === 'unverified') {
+        if (typeof activeSignUp.prepareEmailAddressVerification === 'function') {
+          await activeSignUp.prepareEmailAddressVerification({
+            strategy: 'email_code',
+          });
+        } else if (activeSignUp.verifications?.sendEmailCode) {
+          await activeSignUp.verifications.sendEmailCode();
+        }
         setSignUpNeedsVerification(true);
       } else {
-        setClerkNotice(`Registration status: ${signUp.status}. Proceeding...`);
+        setClerkNotice(`Registration status: ${currentStatus}. Proceeding...`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -436,15 +493,31 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignUp = getActiveSignUp();
+    if (!activeSignUp) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setSignUpCodeLoading(true);
     try {
-      const completeSignUp = await clerk.client.signUp.attemptEmailAddressVerification({
-        code: signUpCode.trim(),
-      });
+      let completeSignUp: any;
+      if (typeof activeSignUp.attemptEmailAddressVerification === 'function') {
+        completeSignUp = await activeSignUp.attemptEmailAddressVerification({
+          code: signUpCode.trim(),
+        });
+      } else if (activeSignUp.verifications?.verifyEmailCode) {
+        completeSignUp = await activeSignUp.verifications.verifyEmailCode({
+          code: signUpCode.trim(),
+        });
+      }
 
-      if (completeSignUp.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: completeSignUp.createdSessionId });
+      const currentStatus = completeSignUp?.status || activeSignUp?.status;
+      const currentSessionId = completeSignUp?.createdSessionId || activeSignUp?.createdSessionId;
+
+      if (currentStatus === 'complete' || (completeSignUp && !completeSignUp.error)) {
+        if (currentSessionId && clerk.setActive) {
+          await clerk.setActive({ session: currentSessionId });
         }
         try {
           await signInProduction();
@@ -454,7 +527,7 @@ export function LoginScreen() {
           );
         }
       } else {
-        setClerkError(`Registration incomplete (${completeSignUp.status}). Check code and retry.`);
+        setClerkError(`Registration incomplete (${currentStatus || 'verification_pending'}). Check code and retry.`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
