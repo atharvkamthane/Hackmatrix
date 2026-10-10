@@ -16,6 +16,8 @@ import {
   Legend,
 } from 'recharts';
 
+import { useSocket } from '../hooks/useSocket';
+
 export const TrendsPage: React.FC = () => {
   const [filters, setFilters] = useState<TrendsQueryFilters>({
     condition: '',
@@ -41,6 +43,10 @@ export const TrendsPage: React.FC = () => {
       setIsLoading(false);
     }
   }, [filters]);
+
+  useSocket(useCallback(() => {
+    void fetchTrends();
+  }, [fetchTrends]));
 
   useEffect(() => {
     fetchTrends();

@@ -50,6 +50,22 @@ export const DemoDataBadge: React.FC<{ onToggle?: () => void }> = ({ onToggle })
   </div>
 );
 
+export const LiveDataBadge: React.FC<{ onToggle?: () => void }> = ({ onToggle }) => (
+  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-xs">
+    <Database className="w-3.5 h-3.5 text-emerald-700" />
+    <span>LIVE DATA (ETL PIPELINE)</span>
+    {onToggle && (
+      <button
+        onClick={onToggle}
+        className="ml-1 underline text-[11px] hover:text-emerald-950 font-normal cursor-pointer text-slate-500"
+        title="Switch to Demo Mode"
+      >
+        Demo Mode
+      </button>
+    )}
+  </div>
+);
+
 export const SuppressedValueBadge: React.FC = () => (
   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
     <AlertCircle className="w-3 h-3 text-slate-400" />

@@ -1,4 +1,4 @@
-import type { mongo } from "mongoose";
+import { Types, type mongo } from "mongoose";
 type ChangeStream = mongo.ChangeStream;
 type Document = Record<string, unknown>;
 import type { DatabaseConnections } from "../db/connections";
@@ -249,6 +249,42 @@ export class EtlEngine {
           this.lastPollDate = docUpdated;
         }
         processedCount += 1;
+      }
+
+      // Standalone MongoDB polling deletion detection:
+      // Reconcile active ledger records against clinical conditions to capture deletions
+      const activeLedgers = await this.analyticsModels.EtlLedger.find({ status: "ACTIVE" })
+        .select({ sourceId: 1 })
+        .lean()
+        .exec();
+
+      if (activeLedgers.length > 0) {
+        const sourceIds = activeLedgers.map((l) => l.sourceId);
+        const sourceObjectIds = sourceIds
+          .map((id) => {
+            try {
+              return Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : null;
+            } catch {
+              return null;
+            }
+          })
+          .filter((id): id is Types.ObjectId => id !== null);
+
+        const existingConditions = await this.clinicalModels.Condition.find({
+          _id: { $in: sourceObjectIds },
+        })
+          .select({ _id: 1 })
+          .lean()
+          .exec();
+
+        const existingIdSet = new Set(existingConditions.map((c) => c._id.toString()));
+
+        for (const ledger of activeLedgers) {
+          if (!existingIdSet.has(ledger.sourceId)) {
+            await this.processSingleDoc({ _id: ledger.sourceId }, true);
+            processedCount += 1;
+          }
+        }
       }
 
       if (processedCount > 0) {

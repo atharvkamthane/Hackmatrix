@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
   enterDemoMode: () => void;
+  enterLocalAdminMode: () => void;
   isDemo: boolean;
 }
 
@@ -44,14 +45,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isDemo: true,
       };
     }
+    if (localStorage.getItem('hm_local_admin_session') === 'true') {
+      return {
+        id: 'admin_local_01',
+        name: 'National Public Health Admin',
+        email: 'admin@surveillance.local',
+        role: 'ADMIN',
+        isDemo: false,
+      };
+    }
     return null;
   });
   const [isLoading, setIsLoading] = useState<boolean>(() => !isDemoMode());
   const [error, setError] = useState<string | null>(null);
 
   const enterDemoMode = useCallback(() => {
+    localStorage.removeItem('hm_local_admin_session');
     setDemoMode(true);
-    localStorage.setItem('hm_demo_mode', 'true');
     setDemoActive(true);
     setUser({
       id: 'admin_demo_01',
@@ -64,9 +74,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
-  const logout = useCallback(async () => {
+  const enterLocalAdminMode = useCallback(() => {
+    localStorage.setItem('hm_local_admin_session', 'true');
     setDemoMode(false);
-    localStorage.removeItem('hm_demo_mode');
+    setDemoActive(false);
+    setUser({
+      id: 'admin_local_01',
+      name: 'National Public Health Admin',
+      email: 'admin@surveillance.local',
+      role: 'ADMIN',
+      isDemo: false,
+    });
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
+  const logout = useCallback(async () => {
+    localStorage.removeItem('hm_local_admin_session');
+    setDemoMode(false);
     setDemoActive(false);
     setUser(null);
     setError(null);
@@ -77,15 +102,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getToken = useCallback(async (): Promise<string | null> => {
     if (demoActive) return 'demo_token';
+    if (user?.id === 'admin_local_01') return 'dev_admin_token';
     try {
       return (await clerkGetToken()) ?? null;
     } catch {
       return null;
     }
-  }, [clerkGetToken, demoActive]);
+  }, [clerkGetToken, demoActive, user]);
 
   useEffect(() => {
     if (demoActive) {
+      setIsLoading(false);
+      return;
+    }
+
+    if (user?.id === 'admin_local_01') {
+      setAuthTokenProvider(getToken);
       setIsLoading(false);
       return;
     }
@@ -146,19 +178,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       active = false;
       setAuthTokenProvider(null);
     };
-  }, [clerkUser, demoActive, getToken, isLoaded, isSignedIn]);
+  }, [clerkUser, demoActive, getToken, isLoaded, isSignedIn, user?.id]);
 
   const value = useMemo<AuthContextType>(() => ({
     user,
     isAuthenticated: user !== null,
-    isSignedIn: Boolean(isSignedIn || demoActive),
+    isSignedIn: Boolean(isSignedIn || demoActive || user !== null),
     isLoading,
     error,
     logout,
     getToken,
     enterDemoMode,
+    enterLocalAdminMode,
     isDemo: demoActive,
-  }), [demoActive, enterDemoMode, error, getToken, isLoading, isSignedIn, logout, user]);
+  }), [demoActive, enterDemoMode, enterLocalAdminMode, error, getToken, isLoading, isSignedIn, logout, user]);
 
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

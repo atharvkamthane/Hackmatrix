@@ -73,6 +73,10 @@ export function useSocket(onAnalyticsUpdate?: (payload: AnalyticsUpdatePayload) 
       setStatus('reconnecting');
     });
 
+    socket.on('reconnect_failed', () => {
+      setStatus('offline');
+    });
+
     socket.on('analytics:update', (payload: unknown) => {
       // Validate payload for privacy safety: reject patient-level fields if present
       if (!payload || typeof payload !== 'object') return;

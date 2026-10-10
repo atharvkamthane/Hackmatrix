@@ -582,3 +582,46 @@ test("14. ETL failures and lag are observable without leaking personal data", ()
   assert.equal(raw.patientName, undefined);
   assert.equal(raw.sourceRecord, undefined);
 });
+
+// 15. Regression: Resolved and remission clinical statuses are transformed to INACTIVE
+test("15. Regression: Resolved and remission clinical statuses are transformed to INACTIVE", () => {
+  const patientId = new mongoose.Types.ObjectId();
+  const resResolved = transformCondition({
+    _id: "cond_res_1",
+    patientId,
+    code: "VEC_DENGUE",
+    clinicalStatus: "resolved",
+    onsetDate: new Date("2026-10-01"),
+  }, { regionId: "reg_mh" });
+
+  assert.equal(resResolved.success, true);
+  if (resResolved.success) {
+    assert.equal(resResolved.fact.status, "INACTIVE");
+  }
+
+  const resRemission = transformCondition({
+    _id: "cond_res_2",
+    patientId,
+    code: "VEC_DENGUE",
+    clinicalStatus: "remission",
+    onsetDate: new Date("2026-10-01"),
+  }, { regionId: "reg_mh" });
+
+  assert.equal(resRemission.success, true);
+  if (resRemission.success) {
+    assert.equal(resRemission.fact.status, "INACTIVE");
+  }
+
+  const resActive = transformCondition({
+    _id: "cond_res_3",
+    patientId,
+    code: "VEC_DENGUE",
+    clinicalStatus: "active",
+    onsetDate: new Date("2026-10-01"),
+  }, { regionId: "reg_mh" });
+
+  assert.equal(resActive.success, true);
+  if (resActive.success) {
+    assert.equal(resActive.fact.status, "ACTIVE");
+  }
+});

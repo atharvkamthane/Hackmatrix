@@ -6,6 +6,8 @@ import { TableSkeleton } from '../components/common/SkeletonLoader';
 import { ErrorAlert } from '../components/common/ErrorAlert';
 import { Search, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 
+import { useSocket } from '../hooks/useSocket';
+
 export const RegionsPage: React.FC = () => {
   const [data, setData] = useState<RegionsResponseDTO | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -28,6 +30,10 @@ export const RegionsPage: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  useSocket(useCallback(() => {
+    void loadRegions();
+  }, [loadRegions]));
 
   useEffect(() => {
     loadRegions();
