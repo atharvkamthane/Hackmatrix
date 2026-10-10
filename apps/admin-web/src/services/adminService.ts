@@ -19,11 +19,10 @@ import {
 } from './mockDataService';
 
 export const isDemoMode = (): boolean => {
-  return import.meta.env.VITE_DEMO_MODE === 'true' && localStorage.getItem('hm_demo_mode') !== 'false';
+  return localStorage.getItem('hm_demo_mode') === 'true';
 };
 
 export const setDemoMode = (enabled: boolean): void => {
-  if (import.meta.env.VITE_DEMO_MODE !== 'true') return;
   localStorage.setItem('hm_demo_mode', enabled ? 'true' : 'false');
 };
 

@@ -15,6 +15,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 
+import { useSocket } from '../hooks/useSocket';
+
 export const ConditionsPage: React.FC = () => {
   const [conditions, setConditions] = useState<ConditionCategoryDTO[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -32,6 +34,10 @@ export const ConditionsPage: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  useSocket(useCallback(() => {
+    void loadConditions();
+  }, [loadConditions]));
 
   useEffect(() => {
     loadConditions();

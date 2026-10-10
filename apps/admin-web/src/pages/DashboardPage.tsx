@@ -31,6 +31,8 @@ import {
   Cell,
 } from 'recharts';
 
+import { useSocket } from '../hooks/useSocket';
+
 export const DashboardPage: React.FC = () => {
   const [data, setData] = useState<AdminSummaryDTO | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -48,6 +50,10 @@ export const DashboardPage: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  useSocket(useCallback(() => {
+    void loadDashboardData();
+  }, [loadDashboardData]));
 
   useEffect(() => {
     loadDashboardData();

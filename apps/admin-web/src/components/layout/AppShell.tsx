@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../hooks/useSocket';
-import { SocketStatusBadge, PrivacyThresholdBadge, DemoDataBadge } from '../common/DataBadges';
+import { SocketStatusBadge, PrivacyThresholdBadge, DemoDataBadge, LiveDataBadge } from '../common/DataBadges';
 import { isDemoMode, setDemoMode } from '../../services/adminService';
 import {
   Activity,
@@ -45,6 +45,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     const nextState = !demoActive;
     setDemoMode(nextState);
     setDemoActive(nextState);
+    if (!nextState) {
+      localStorage.setItem('hm_local_admin_session', 'true');
+    }
     window.location.reload();
   };
 
@@ -77,7 +80,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-3">
-            {demoActive && <DemoDataBadge onToggle={handleToggleDemoMode} />}
+            {demoActive ? (
+              <DemoDataBadge onToggle={handleToggleDemoMode} />
+            ) : (
+              <LiveDataBadge onToggle={handleToggleDemoMode} />
+            )}
             <div className="hidden lg:flex items-center gap-2">
               <PrivacyThresholdBadge />
               <SocketStatusBadge status={status} lastUpdated={lastEventTime} />

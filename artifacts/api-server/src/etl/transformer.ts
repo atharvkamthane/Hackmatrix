@@ -108,7 +108,8 @@ export function transformCondition(
 
   // 4. Determine surveillance status
   const rawStatus = (doc.clinicalStatus ?? "active").toLowerCase().trim();
-  const status: "ACTIVE" | "INACTIVE" = rawStatus === "inactive" ? "INACTIVE" : "ACTIVE";
+  const isInactive = rawStatus === "inactive" || rawStatus === "resolved" || rawStatus === "remission";
+  const status: "ACTIVE" | "INACTIVE" = isInactive ? "INACTIVE" : "ACTIVE";
 
   // 5. Deterministic pseudonym hash for patient (zero direct ID)
   const patientHash = hashPatientId(doc.patientId);
