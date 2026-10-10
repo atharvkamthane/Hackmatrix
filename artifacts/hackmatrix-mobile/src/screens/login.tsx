@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useClerk, useSignIn, useSignUp } from '@clerk/expo';
+import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Button, Card, Field, InfoBanner, RoleLabel } from '@/src/components/ui';
 import { useAppContext } from '@/src/context/AppContext';
 import { useColors } from '@/hooks/useColors';
@@ -85,6 +86,8 @@ export function LoginScreen() {
   const clerk = useClerk();
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
+  const { startHostedAuth } = useHostedAuth();
+  const [hostedLoading, setHostedLoading] = useState(false);
   const { isReady, role, isUnprovisioned, provisionSelf, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
 
   // Top Tabs: Clerk Production vs Demo Sandbox
@@ -252,6 +255,26 @@ export function LoginScreen() {
     }
   };
 
+  const handleHostedAuth = async (mode: 'sign-in' | 'sign-up') => {
+    clearError();
+    setClerkError(null);
+    setClerkNotice(null);
+    setHostedLoading(true);
+    try {
+      const res = await startHostedAuth({ mode });
+      if (res?.createdSessionId) {
+        if (clerk.setActive) {
+          await clerk.setActive({ session: res.createdSessionId });
+        }
+        await signInProduction();
+      }
+    } catch (err: unknown) {
+      setClerkError(extractClerkErrorMessage(err));
+    } finally {
+      setHostedLoading(false);
+    }
+  };
+
   const getActiveSignUp = () => {
     return (signUp as any) || (clerk as any)?.client?.signUp || (clerk as any)?.signUp;
   };
@@ -282,24 +305,57 @@ export function LoginScreen() {
     try {
       let result: any;
       try {
-        result = await activeSignIn.create({
-          identifier: clerkEmail.trim(),
-          password: clerkPassword,
-        });
+        result = await Promise.race([
+          activeSignIn.create({
+            identifier: clerkEmail.trim(),
+            password: clerkPassword,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    'Sign in request timed out. If Native API is not enabled in your Clerk Dashboard, please use the Clerk Web Portal button above.'
+                  )
+                ),
+              12000
+            )
+          ),
+        ]);
       } catch (firstErr: unknown) {
         const msg = extractClerkErrorMessage(firstErr);
         if (msg.toLowerCase().includes('already signed in') || msg.toLowerCase().includes('session')) {
           if (clerk.signOut) {
-            await clerk.signOut();
+            try {
+              await Promise.race([
+                clerk.signOut(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+              ]);
+            } catch {
+              // ignore
+            }
           }
           const retrySignIn = getActiveSignIn();
           if (!retrySignIn) {
             throw firstErr;
           }
-          result = await retrySignIn.create({
-            identifier: clerkEmail.trim(),
-            password: clerkPassword,
-          });
+          result = await Promise.race([
+            retrySignIn.create({
+              identifier: clerkEmail.trim(),
+              password: clerkPassword,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      'Sign in request timed out. If Native API is not enabled in your Clerk Dashboard, please use the Clerk Web Portal button above.'
+                    )
+                  ),
+                12000
+              )
+            ),
+          ]);
         } else {
           throw firstErr;
         }
@@ -445,21 +501,37 @@ export function LoginScreen() {
     try {
       if (clerk.session || clerk.user) {
         try {
-          await clerk.signOut();
+          await Promise.race([
+            clerk.signOut(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+          ]);
         } catch {
           // ignore
         }
       }
 
-      const result = await activeSignUp.create({
-        emailAddress: signUpEmail.trim(),
-        password: signUpPassword,
-        firstName: signUpFirstName.trim() || undefined,
-        lastName: signUpLastName.trim() || undefined,
-        unsafeMetadata: {
-          requestedRole: signUpRole.toUpperCase(),
-        },
-      });
+      const result = await Promise.race([
+        activeSignUp.create({
+          emailAddress: signUpEmail.trim(),
+          password: signUpPassword,
+          firstName: signUpFirstName.trim() || undefined,
+          lastName: signUpLastName.trim() || undefined,
+          unsafeMetadata: {
+            requestedRole: signUpRole.toUpperCase(),
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Registration request timed out. If Native API is not enabled in your Clerk Dashboard, please tap "Sign Up via Clerk Web Portal" above.'
+                )
+              ),
+            12000
+          )
+        ),
+      ]);
 
       if (result?.error) {
         setClerkError(extractClerkErrorMessage(result.error));
@@ -519,13 +591,23 @@ export function LoginScreen() {
     try {
       let completeSignUp: any;
       if (typeof activeSignUp.attemptEmailAddressVerification === 'function') {
-        completeSignUp = await activeSignUp.attemptEmailAddressVerification({
-          code: signUpCode.trim(),
-        });
+        completeSignUp = await Promise.race([
+          activeSignUp.attemptEmailAddressVerification({
+            code: signUpCode.trim(),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Code verification request timed out.')), 12000)
+          ),
+        ]);
       } else if (activeSignUp.verifications?.verifyEmailCode) {
-        completeSignUp = await activeSignUp.verifications.verifyEmailCode({
-          code: signUpCode.trim(),
-        });
+        completeSignUp = await Promise.race([
+          activeSignUp.verifications.verifyEmailCode({
+            code: signUpCode.trim(),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Code verification request timed out.')), 12000)
+          ),
+        ]);
       }
 
       if (completeSignUp?.error) {
@@ -941,6 +1023,35 @@ export function LoginScreen() {
                 Create New Account
               </Text>
             </Pressable>
+          </View>
+
+          {/* Quick Hosted Authentication (Clerk Web Portal - Recommended for Expo Go) */}
+          <Card style={[styles.clerkCard, { marginBottom: 10, backgroundColor: colors.secondary }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Feather name="globe" size={16} color={colors.primary} />
+              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.foreground }}>
+                {clerkMode === 'signup' ? 'Hosted Web Portal (Quick Sign Up)' : 'Hosted Web Portal (Quick Sign In)'}
+              </Text>
+            </View>
+            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: colors.mutedForeground, marginBottom: 10, lineHeight: 16 }}>
+              Opens Clerk's browser portal. Recommended for Expo Go — works instantly without requiring Native API dashboard activation.
+            </Text>
+            <Button
+              label={clerkMode === 'signup' ? 'Sign Up via Clerk Web Portal' : 'Sign In via Clerk Web Portal'}
+              icon="external-link"
+              variant="outline"
+              onPress={() => void handleHostedAuth(clerkMode === 'signup' ? 'sign-up' : 'sign-in')}
+              loading={hostedLoading}
+              testID="hosted-auth-button"
+            />
+          </Card>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: colors.mutedForeground }}>
+              or continue with in-app form
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
           </View>
 
           {/* CLERK MODE 1: SIGN IN */}
