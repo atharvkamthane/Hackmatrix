@@ -44,6 +44,14 @@ export function createClerkVerifier(config: AppConfig): VerifyClerkRequest {
           organizationId: "org_admin_surveillance",
         };
       }
+      if (authHeader && authHeader.startsWith("Bearer test_user_")) {
+        const testUserId = authHeader.replace("Bearer ", "").trim();
+        return {
+          userId: testUserId,
+          roleClaim: null,
+          organizationId: null,
+        };
+      }
     }
     const requestState = await clerkClient.authenticateRequest(request, {
       authorizedParties: config.clerkAuthorizedParties.length

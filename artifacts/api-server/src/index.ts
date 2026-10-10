@@ -132,7 +132,7 @@ async function startServer(): Promise<void> {
     const findInternalUser = async (clerkUserId: string) => {
       if (!models) return null;
       let user = await models.User.findOne({ clerkUserId }).lean().exec();
-      if (!user && config.NODE_ENV !== "production") {
+      if (!user && config.NODE_ENV !== "production" && clerkUserId === "user_dev_admin") {
         let adminOrg = await models.Organization.findOne({ name: "National Disease Surveillance Agency" });
         if (!adminOrg) {
           adminOrg = await models.Organization.create({
@@ -145,7 +145,7 @@ async function startServer(): Promise<void> {
           });
         }
         const createdUser = await models.User.create({
-          clerkUserId,
+          clerkUserId: "user_dev_admin",
           role: "ADMIN",
           organizationId: adminOrg._id,
           status: "active",

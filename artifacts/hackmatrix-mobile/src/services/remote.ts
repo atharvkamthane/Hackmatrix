@@ -4,6 +4,7 @@ import type {
   AccessHistoryEntry,
   AccessRequest,
   AuthorizedPatient,
+  Condition,
   DemoState,
   Encounter,
   Observation,
@@ -58,6 +59,9 @@ export const remoteServices = {
     const overview = await getJSON<DemoAccessOverview>('/api/access/overview');
     return overview.history;
   },
+  async getClinicianMe(): Promise<{ id: string; name: string; professionalId?: string; organization: string; role: string }> {
+    return getJSON('/api/clinician/me');
+  },
   async resolveQrToken(token: string): Promise<AccessRequest> {
     return postJSON('/api/clinician/qr/resolve', { token });
   },
@@ -78,6 +82,17 @@ export const remoteServices = {
   },
   async createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'> & { patientId: string }): Promise<Observation> {
     return postJSON('/api/clinician/observations', input);
+  },
+  async createCondition(input: { patientId: string; display: string; code?: string; date?: string }): Promise<Condition> {
+    return postJSON('/api/clinician/conditions', input);
+  },
+  async provisionSelf(input: { role: 'PATIENT' | 'CLINICIAN'; name: string; detail?: string }): Promise<{ success: boolean; message: string; user: any }> {
+    return postJSON('/api/auth/provision-self', {
+      role: input.role,
+      name: input.name,
+      displayName: input.name,
+      detail: input.detail,
+    });
   },
 };
 

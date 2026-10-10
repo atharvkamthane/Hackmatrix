@@ -10,8 +10,20 @@ export interface AuthenticatedIdentity {
   organizationId: string | null;
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 interface ApiErrorBody {
-  error?: { message?: string };
+  error?: { message?: string; code?: string };
+  message?: string;
 }
 
 /**
@@ -37,11 +49,16 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   headers.set('Accept', 'application/json');
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as ApiErrorBody | null;
-    throw new Error(body?.error?.message ?? `Request failed (${response.status}).`);
+    const msg = body?.error?.message ?? body?.message ?? `Request failed (${response.status}).`;
+    const code = body?.error?.code;
+    throw new ApiError(msg, response.status, code);
   }
   return response;
 }
@@ -54,3 +71,4 @@ export async function getAuthenticatedIdentity(): Promise<AuthenticatedIdentity>
   }
   return identity;
 }
+
