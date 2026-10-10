@@ -40,7 +40,7 @@ export function Screen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { role, switchDemoRole } = useAppContext();
+  const { role, switchDemoRole, isDemoMode } = useAppContext();
   const router = useRouter();
   const webTop = Platform.OS === 'web' ? 67 : 10;
   const bottomSpace = Platform.OS === 'web' ? 110 : 104 + insets.bottom;
@@ -67,8 +67,17 @@ export function Screen({
             <Feather name="activity" size={15} color={colors.primaryForeground} />
           </View>
           <Text style={[styles.brandName, { color: colors.foreground }]}>HackMatrix</Text>
+          {isDemoMode ? (
+            <View style={[styles.badge, { backgroundColor: colors.warningSurface }]}>
+              <Text style={[styles.badgeText, { color: colors.warning }]}>DEMO</Text>
+            </View>
+          ) : (
+            <View style={[styles.badge, { backgroundColor: colors.successSurface }]}>
+              <Text style={[styles.badgeText, { color: colors.success }]}>VERIFIED</Text>
+            </View>
+          )}
         </View>
-        {showRoleSwitch && role ? (
+        {showRoleSwitch && isDemoMode && role ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Switch from ${role} demo role`}

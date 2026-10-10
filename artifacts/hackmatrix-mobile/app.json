@@ -14,13 +14,16 @@
     "web": {
       "favicon": "./assets/images/icon_2.png"
     },
-    "splash": {
-      "backgroundColor": "#F3F8F6",
-      "image": "./assets/images/icon_2.png",
-      "resizeMode": "contain"
-    },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F3F8F6",
+          "image": "./assets/images/icon_2.png",
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-camera",
         {

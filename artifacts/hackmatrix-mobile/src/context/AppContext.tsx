@@ -6,81 +6,208 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { services } from '@/src/services';
+import { getAuthenticatedIdentity, type AuthenticatedIdentity } from '@/src/services/api';
+import { getClerkInstance } from '@clerk/expo';
 import type { Role } from '@/src/types/models';
 import type { DemoAccessOverview } from '@/src/services/contracts';
 
-interface AppContextValue {
+const AUTH_MODE_KEY = 'hackmatrix.auth.mode.v2';
+
+export type AuthMode = 'demo' | 'production';
+
+export interface AppContextValue {
+  authMode: AuthMode | null;
+  isDemoMode: boolean;
   role: Role | null;
+  serverIdentity: AuthenticatedIdentity | null;
   isReady: boolean;
   data: DemoAccessOverview | null;
   error: string | null;
   signIn: (role: Role) => Promise<void>;
+  signInDemo: (role: Role) => Promise<void>;
+  signInProduction: () => Promise<void>;
   signOut: () => Promise<void>;
   switchDemoRole: () => Promise<void>;
   refresh: () => Promise<void>;
+  clearError: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [role, setRole] = useState<Role | null>(null);
+  const [serverIdentity, setServerIdentity] = useState<AuthenticatedIdentity | null>(null);
   const [data, setData] = useState<DemoAccessOverview | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const clearError = useCallback(() => setError(null), []);
+
   const refresh = useCallback(async () => {
-    try {
-      const next = await services.patient.getDemoOverview();
-      setData(next);
-      setError(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load the demo data.');
+    if (authMode === 'demo') {
+      try {
+        const next = await services.patient.getDemoOverview();
+        setData(next);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Unable to load the demo data.');
+      }
+    } else if (authMode === 'production') {
+      try {
+        const identity = await getAuthenticatedIdentity();
+        setServerIdentity(identity);
+        const resolvedRole: Role = identity.role === 'CLINICIAN' ? 'clinician' : 'patient';
+        setRole(resolvedRole);
+        setData(null);
+        setError(null);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Failed to refresh production authorization.');
+      }
     }
-  }, []);
+  }, [authMode]);
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([services.auth.getSession(), services.patient.getDemoOverview()])
-      .then(([session, demoOverview]) => {
-        if (!mounted) return;
-        setRole(session?.role ?? null);
-        setData(demoOverview);
-      })
-      .catch((cause: unknown) => {
-        if (mounted) {
-          setError(cause instanceof Error ? cause.message : 'Unable to load the demo.');
+    async function restoreSession() {
+      try {
+        const savedMode = await AsyncStorage.getItem(AUTH_MODE_KEY);
+        if (savedMode === 'demo') {
+          const [session, demoOverview] = await Promise.all([
+            services.auth.getSession(),
+            services.patient.getDemoOverview(),
+          ]);
+          if (!mounted) return;
+          if (session?.role) {
+            setAuthMode('demo');
+            setRole(session.role);
+            setData(demoOverview);
+          }
+        } else if (savedMode === 'production') {
+          try {
+            const identity = await getAuthenticatedIdentity();
+            if (!mounted) return;
+            setAuthMode('production');
+            setServerIdentity(identity);
+            setRole(identity.role === 'CLINICIAN' ? 'clinician' : 'patient');
+            setData(null);
+          } catch (prodErr) {
+            if (!mounted) return;
+            setAuthMode('production');
+            setRole(null);
+            setServerIdentity(null);
+            setData(null);
+            setError(prodErr instanceof Error ? prodErr.message : 'Production session expired.');
+          }
         }
-      })
-      .finally(() => {
+      } catch (cause) {
+        if (mounted) {
+          setError(cause instanceof Error ? cause.message : 'Failed to initialize session.');
+        }
+      } finally {
         if (mounted) setIsReady(true);
-      });
+      }
+    }
+    void restoreSession();
     return () => {
       mounted = false;
     };
   }, []);
 
-  const signIn = useCallback(async (nextRole: Role) => {
-    const session = await services.auth.signIn(nextRole);
-    setRole(session.role);
-    await refresh();
-  }, [refresh]);
-
-  const signOut = useCallback(async () => {
-    await services.auth.signOut();
-    setRole(null);
+  const signInDemo = useCallback(async (nextRole: Role) => {
+    try {
+      await AsyncStorage.setItem(AUTH_MODE_KEY, 'demo');
+      const session = await services.auth.signIn(nextRole);
+      setAuthMode('demo');
+      setRole(session.role);
+      setServerIdentity(null);
+      setError(null);
+      const demoOverview = await services.patient.getDemoOverview();
+      setData(demoOverview);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to start demo session.');
+      throw cause;
+    }
   }, []);
 
+  const signIn = signInDemo;
+
+  const signInProduction = useCallback(async () => {
+    try {
+      setError(null);
+      const identity = await getAuthenticatedIdentity();
+      await AsyncStorage.setItem(AUTH_MODE_KEY, 'production');
+      setAuthMode('production');
+      setServerIdentity(identity);
+      const appRole: Role = identity.role === 'CLINICIAN' ? 'clinician' : 'patient';
+      setRole(appRole);
+      setData(null);
+    } catch (cause) {
+      const msg = cause instanceof Error ? cause.message : 'Production sign-in failed.';
+      setAuthMode('production');
+      setRole(null);
+      setServerIdentity(null);
+      setData(null);
+      setError(msg);
+      throw cause;
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(AUTH_MODE_KEY);
+      if (authMode === 'demo') {
+        await services.auth.signOut();
+      } else {
+        try {
+          const clerk = getClerkInstance();
+          if (clerk?.signOut) {
+            await clerk.signOut();
+          }
+        } catch {
+          // Ignore Clerk sign-out failure on unmounted or offline instances
+        }
+      }
+    } finally {
+      setAuthMode(null);
+      setRole(null);
+      setServerIdentity(null);
+      setData(null);
+      setError(null);
+    }
+  }, [authMode]);
+
   const switchDemoRole = useCallback(async () => {
+    if (authMode !== 'demo') {
+      throw new Error('Role switching is disabled in production mode. Identity is server-controlled.');
+    }
     const nextRole: Role = role === 'patient' ? 'clinician' : 'patient';
     const session = await services.auth.signIn(nextRole);
     setRole(session.role);
-    await refresh();
-  }, [refresh, role]);
+    const demoOverview = await services.patient.getDemoOverview();
+    setData(demoOverview);
+  }, [authMode, role]);
 
   const value = useMemo(
-    () => ({ role, isReady, data, error, signIn, signOut, switchDemoRole, refresh }),
-    [data, error, isReady, refresh, role, signIn, signOut, switchDemoRole],
+    () => ({
+      authMode,
+      isDemoMode: authMode === 'demo',
+      role,
+      serverIdentity,
+      isReady,
+      data,
+      error,
+      signIn,
+      signInDemo,
+      signInProduction,
+      signOut,
+      switchDemoRole,
+      refresh,
+      clearError,
+    }),
+    [authMode, clearError, data, error, isReady, refresh, role, serverIdentity, signIn, signInDemo, signInProduction, signOut, switchDemoRole],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -302,6 +302,17 @@ function getOrCreate<T>(
 }
 
 export function createClinicalModels(connection: Connection): ClinicalModels {
+  const plane = (connection as unknown as { plane?: string }).plane;
+  if (plane && plane !== "clinical") {
+    throw new Error(
+      `Cannot register clinical models on ${plane} connection. Clinical models are restricted to the clinical data plane.`,
+    );
+  }
+  if (connection.name && connection.name.toLowerCase().includes("analytics")) {
+    throw new Error(
+      "Cannot register clinical models on analytics connection. Clinical models are restricted to the clinical data plane.",
+    );
+  }
   const models = {
     User: getOrCreate(connection, "User", userSchema),
     Organization: getOrCreate(connection, "Organization", organizationSchema),

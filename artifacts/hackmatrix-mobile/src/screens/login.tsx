@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, InfoBanner, RoleLabel } from '@/src/components/ui';
 import { useAppContext } from '@/src/context/AppContext';
@@ -12,9 +12,10 @@ export function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isReady, role, signIn } = useAppContext();
+  const { isReady, role, signInDemo, signInProduction, error, clearError } = useAppContext();
   const [selectedRole, setSelectedRole] = useState<Role>('patient');
-  const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [prodLoading, setProdLoading] = useState(false);
 
   useEffect(() => {
     if (!isReady || !role) return;
@@ -22,23 +23,45 @@ export function LoginScreen() {
   }, [isReady, role, router]);
 
   const continueToDemo = async () => {
-    setLoading(true);
+    clearError();
+    setDemoLoading(true);
     try {
-      await signIn(selectedRole);
+      await signInDemo(selectedRole);
       router.replace((selectedRole === 'patient' ? '/(patient)/(tabs)' : '/(clinician)/(tabs)') as never);
+    } catch {
+      // Error handled by context
     } finally {
-      setLoading(false);
+      setDemoLoading(false);
+    }
+  };
+
+  const handleProductionSignIn = async () => {
+    clearError();
+    setProdLoading(true);
+    try {
+      await signInProduction();
+    } catch {
+      // Error handled by context and rendered in UI banner
+    } finally {
+      setProdLoading(false);
     }
   };
 
   return (
-    <View style={[styles.page, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.scrollPage,
+        { backgroundColor: colors.background, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.brand}>
         <View style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Feather name="activity" size={19} color={colors.primaryForeground} />
         </View>
         <Text style={[styles.brandName, { color: colors.foreground }]}>HackMatrix</Text>
       </View>
+
       <View style={styles.hero}>
         <RoleLabel role="patient" />
         <Text style={[styles.title, { color: colors.foreground }]}>Your health,{'\n'}in trusted hands.</Text>
@@ -46,7 +69,47 @@ export function LoginScreen() {
           A shared care space where you decide when your records are shared.
         </Text>
       </View>
-      <Text style={[styles.prompt, { color: colors.foreground }]}>Choose a demo role</Text>
+
+      {error ? (
+        <View style={styles.errorContainer}>
+          <InfoBanner
+            title="Authentication Error"
+            body={error}
+            tone="warning"
+            icon="alert-octagon"
+          />
+        </View>
+      ) : null}
+
+      {/* Production Authentication Boundary */}
+      <View style={styles.sectionHeader}>
+        <Feather name="lock" size={14} color={colors.primary} />
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Production Identity</Text>
+      </View>
+
+      <Card style={styles.prodCard}>
+        <Text style={[styles.prodTitle, { color: colors.foreground }]}>Verified Healthcare Login</Text>
+        <Text style={[styles.prodDescription, { color: colors.mutedForeground }]}>
+          Authenticates through Clerk. Roles and permissions are server-controlled by the backend.
+        </Text>
+        <Button
+          label="Sign in with Verified Identity"
+          icon="shield"
+          onPress={() => void handleProductionSignIn()}
+          loading={prodLoading}
+          testID="sign-in-production"
+        />
+      </Card>
+
+      {/* Divider */}
+      <View style={styles.dividerRow}>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>OR TEST IN DEMO MODE</Text>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+      </View>
+
+      {/* Demo Sandbox Boundary */}
+      <Text style={[styles.prompt, { color: colors.foreground }]}>Choose a demo sandbox role</Text>
       <Pressable onPress={() => setSelectedRole('patient')} testID="select-patient-role">
         <Card style={[styles.roleCard, selectedRole === 'patient' && { borderColor: colors.primary, backgroundColor: colors.card }]}>
           <View style={[styles.roleIcon, { backgroundColor: colors.successSurface }]}>
@@ -84,7 +147,7 @@ export function LoginScreen() {
           label="Continue to demo"
           icon="arrow-right"
           onPress={() => void continueToDemo()}
-          loading={loading}
+          loading={demoLoading}
           testID="continue-to-demo"
         />
         <InfoBanner
@@ -95,18 +158,27 @@ export function LoginScreen() {
         />
       </View>
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>ADMIN access is available in the separate web experience.</Text>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, paddingHorizontal: 23, paddingBottom: 16, justifyContent: 'center', width: '100%', maxWidth: 560, alignSelf: 'center' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 44 },
+  scrollPage: { flexGrow: 1, paddingHorizontal: 23, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   logo: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 17 },
-  hero: { marginBottom: 27 },
+  hero: { marginBottom: 20 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 34, lineHeight: 39, letterSpacing: -1.3, marginTop: 13 },
   subtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, marginTop: 11, maxWidth: 320 },
+  errorContainer: { marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  prodCard: { padding: 14, gap: 10, marginBottom: 16 },
+  prodTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  prodDescription: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 10 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 0.5 },
   prompt: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginBottom: 11 },
   roleCard: { flexDirection: 'row', alignItems: 'center', padding: 13, gap: 12, marginBottom: 10 },
   roleIcon: { width: 43, height: 43, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
@@ -114,5 +186,5 @@ const styles = StyleSheet.create({
   roleTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   roleText: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16 },
   actions: { marginTop: 12, gap: 15 },
-  footer: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15, marginTop: 8 },
+  footer: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 10, lineHeight: 15, marginTop: 16 },
 });

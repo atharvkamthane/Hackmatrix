@@ -11,6 +11,9 @@ export {
 export { normalizeIdentity, resolveRole } from "./role-resolution";
 export type {
   AuthenticatedUser,
+  FindInternalUser,
+  InternalUserRecord,
   Role,
   VerifiedClerkIdentity,
 } from "./types";
+
