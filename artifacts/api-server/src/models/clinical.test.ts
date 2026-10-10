@@ -62,6 +62,7 @@ test("access requests and grants require explicit scopes", () => {
 
   assert.equal(accessRequest.validateSync(), undefined);
   assert.equal(grant.validateSync(), undefined);
+  assert.equal(accessRequest.requestedDurationMinutes, 60);
   assert.deepEqual(clinicalScopes, ["visits", "prescriptions", "labs"]);
 });
 
@@ -141,12 +142,12 @@ test("cannot register clinical models on a connection with analytics in dbName",
 });
 
 test("admin analytics route module does not import clinical models", () => {
-  const adminRoutePath = path.resolve(process.cwd(), "src/routes/admin.ts");
+  const adminRoutePath = path.resolve(process.cwd(), "src/routes/admin-analytics.ts");
   const adminContent = fs.readFileSync(adminRoutePath, "utf8");
   assert.equal(
     adminContent.includes("models/clinical"),
     false,
-    "admin.ts must not import clinical models directly",
+    "admin-analytics.ts must not import clinical models directly",
   );
 });
 

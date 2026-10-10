@@ -133,7 +133,7 @@ function GrantCard({ grant, onRevoke }: { grant: AccessGrant; onRevoke: () => vo
 export function PatientHomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { data, error, refresh } = useAppContext();
+  const { data, error, refresh, isDemoMode } = useAppContext();
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [records, setRecords] = useState<Pick<DemoState, 'conditions' | 'encounters' | 'prescriptions' | 'observations'> | null>(null);
 
@@ -163,7 +163,7 @@ export function PatientHomeScreen() {
 
   return (
     <Screen title={patient ? `Good morning, ${patient.name.split(' ')[0]}` : 'Your health overview'} subtitle="Your care, organized around you.">
-      {error ? <InfoBanner title="Demo data could not load" body={error} tone="warning" icon="alert-circle" /> : null}
+      {error ? <InfoBanner title={isDemoMode ? 'Demo data could not load' : 'Health data could not load'} body={error} tone="warning" icon="alert-circle" /> : null}
       {!records ? (
         <Card><ActivityIndicator color={colors.primary} /><Text style={[itemStyles.caption, { color: colors.mutedForeground, textAlign: 'center', marginTop: 10 }]}>Loading your health summary…</Text></Card>
       ) : (
@@ -235,7 +235,7 @@ export function PatientHomeScreen() {
         </>
       )}
       <View style={{ marginTop: 7 }}>
-        <Button label="Refresh demo data" icon="refresh-cw" variant="quiet" onPress={() => { void load(); void refresh(); }} />
+        <Button label={isDemoMode ? 'Refresh demo data' : 'Refresh records'} icon="refresh-cw" variant="quiet" onPress={() => { void load(); void refresh(); }} />
       </View>
     </Screen>
   );
@@ -243,6 +243,7 @@ export function PatientHomeScreen() {
 
 export function PatientRecordsScreen() {
   const colors = useColors();
+  const { isDemoMode } = useAppContext();
   const [records, setRecords] = useState<Pick<DemoState, 'conditions' | 'encounters' | 'prescriptions' | 'observations'> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -261,7 +262,7 @@ export function PatientRecordsScreen() {
       {error ? <InfoBanner title="Unable to load records" body={error} tone="warning" icon="alert-circle" /> : null}
       {!records ? <ActivityIndicator color={colors.primary} /> : (
         <>
-          <InfoBanner title="Synthetic demo records" body="These examples are created for this demonstration and do not describe a real person." tone="info" icon="file-text" />
+          {isDemoMode ? <InfoBanner title="Synthetic demo records" body="These examples are created for this demonstration and do not describe a real person." tone="info" icon="file-text" /> : null}
           <SectionTitle title={`Conditions · ${records.conditions.length}`} />
           {records.conditions.length ? records.conditions.map((condition) => <ConditionRow key={condition.id} condition={condition} />) : <EmptyState title="No conditions" description="Conditions added to your profile will appear here." />}
           <SectionTitle title={`Encounters · ${records.encounters.length}`} />

@@ -29,6 +29,9 @@ export function formatAggregateValue(
   val: AggregateValue | undefined | null,
   fallback = 'Suppressed for privacy'
 ): string {
+  if (val?.suppressed && val.reason === 'NO_DATA') {
+    return 'No data available';
+  }
   if (!val || val.suppressed) {
     return fallback;
   }

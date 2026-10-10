@@ -164,8 +164,8 @@ export const DashboardPage: React.FC = () => {
         />
         <StatCard
           title="Data Freshness"
-          value={new Date(data.kpi.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          description={`Last synced ${new Date(data.kpi.lastUpdated).toLocaleDateString()}`}
+          value={data.kpi.lastUpdated ? new Date(data.kpi.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No data'}
+          description={data.kpi.lastUpdated ? `Last synced ${new Date(data.kpi.lastUpdated).toLocaleDateString()}` : 'No aggregate data has been reported.'}
           icon={Clock}
           accentColor="slate"
         />
@@ -301,6 +301,10 @@ export const DashboardPage: React.FC = () => {
                     switch (risk) {
                       case 'ELEVATED':
                         return <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-800 border border-amber-200">ELEVATED</span>;
+                      case 'HIGH':
+                        return <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-800 border border-red-200">HIGH</span>;
+                      case 'UNKNOWN':
+                        return <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 text-slate-600 border border-slate-200">UNKNOWN</span>;
                       case 'MODERATE':
                         return <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-blue-100 text-blue-800 border border-blue-200">MODERATE</span>;
                       case 'LOW':

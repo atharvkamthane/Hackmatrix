@@ -83,7 +83,7 @@ function RequestStatusCard({ request, onOpen }: { request: AccessRequest; onOpen
 export function ClinicianHomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { data, refresh } = useAppContext();
+  const { data, refresh, isDemoMode } = useAppContext();
   const [authorized, setAuthorized] = useState<AuthorizedPatient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export function ClinicianHomeScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setAuthorized(await services.clinician.getAuthorizedPatient(DEMO_PATIENT_ID));
+      setAuthorized(await services.clinician.getAuthorizedPatient(isDemoMode ? DEMO_PATIENT_ID : ''));
       setError(null);
     } catch (cause) {
       setAuthorized(null);
@@ -99,26 +99,26 @@ export function ClinicianHomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDemoMode]);
   useFocusEffect(useCallback(() => { void load(); void refresh(); }, [load, refresh]));
 
   const myRequests = useMemo(
-    () => (data?.requests ?? []).filter((request) => request.clinicianId === CLINICIAN_ID),
-    [data?.requests],
+    () => (data?.requests ?? []).filter((request) => !isDemoMode || request.clinicianId === CLINICIAN_ID),
+    [data?.requests, isDemoMode],
   );
   const pending = myRequests.find((request) => request.status === 'pending');
 
   return (
-    <Screen title="Good morning, Dr. Chen" subtitle="Your clinical workspace, with patient consent at the center.">
+    <Screen title={isDemoMode ? 'Good morning, Dr. Chen' : 'Clinical workspace'} subtitle="Your clinical workspace, with patient consent at the center.">
       <Card style={styles.clinicianHero}>
         <View style={[styles.clinicianHeroIcon, { backgroundColor: colors.infoSurface }]}>
           <Feather name="briefcase" size={19} color={colors.info} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.heroTitle, { color: colors.foreground }]}>Harbor Health Clinic</Text>
-          <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>Clinician demo workspace</Text>
+          <Text style={[styles.heroTitle, { color: colors.foreground }]}>{isDemoMode ? 'Harbor Health Clinic' : 'Assigned organization'}</Text>
+          <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>{isDemoMode ? 'Clinician demo workspace' : 'Verified clinician account'}</Text>
         </View>
-        <Badge label="Secure demo" tone="success" />
+        <Badge label={isDemoMode ? 'Secure demo' : 'Consent required'} tone="success" />
       </Card>
 
       <Pressable onPress={() => router.push('/(clinician)/(tabs)/scanner' as never)} testID="start-qr-scan">
@@ -173,6 +173,7 @@ export function ClinicianHomeScreen() {
 export function ClinicianScannerScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { isDemoMode } = useAppContext();
   const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
@@ -261,8 +262,8 @@ export function ClinicianScannerScreen() {
           {hasScanned && !busy ? <Button label="Scan again" icon="refresh-cw" onPress={resetScanner} variant="secondary" /> : null}
         </Card>
       )}
-      <Button label="Run demo scan" icon="grid" onPress={() => void simulateScan()} loading={busy} variant="outline" testID="simulate-qr-scan" />
-      <Text style={[styles.centerNote, { color: colors.mutedForeground }]}>Camera scans resolve against this device’s local demo data. Use Run demo scan for the complete one-device consent flow; cross-device sharing needs the team API.</Text>
+      {isDemoMode ? <Button label="Run demo scan" icon="grid" onPress={() => void simulateScan()} loading={busy} variant="outline" testID="simulate-qr-scan" /> : null}
+      <Text style={[styles.centerNote, { color: colors.mutedForeground }]}>{isDemoMode ? 'Camera scans resolve against this device’s local demo data. Use Run demo scan for the complete one-device consent flow.' : 'Camera scans are verified by the shared API. Scanning creates a request; it never grants record access.'}</Text>
     </Screen>
   );
 }
@@ -270,23 +271,23 @@ export function ClinicianScannerScreen() {
 export function ClinicianPatientsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { data, refresh } = useAppContext();
+  const { data, refresh, isDemoMode } = useAppContext();
   const [authorized, setAuthorized] = useState<AuthorizedPatient | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setAuthorized(await services.clinician.getAuthorizedPatient(DEMO_PATIENT_ID));
+      setAuthorized(await services.clinician.getAuthorizedPatient(isDemoMode ? DEMO_PATIENT_ID : ''));
     } catch {
       setAuthorized(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDemoMode]);
   useFocusEffect(useCallback(() => { void load(); void refresh(); }, [load, refresh]));
 
-  const myRequests = (data?.requests ?? []).filter((request) => request.clinicianId === CLINICIAN_ID);
+  const myRequests = (data?.requests ?? []).filter((request) => !isDemoMode || request.clinicianId === CLINICIAN_ID);
   return (
     <Screen title="Patients & requests" subtitle="Only patients with a valid grant can be opened.">
       {loading ? <Card><ActivityIndicator color={colors.primary} /></Card> : authorized ? (
@@ -315,7 +316,7 @@ export function ClinicianPatientsScreen() {
 export function ClinicianWaitingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { switchDemoRole } = useAppContext();
+  const { switchDemoRole, isDemoMode } = useAppContext();
   const params = useLocalSearchParams<{ id?: string }>();
   const requestId = typeof params.id === 'string' ? params.id : '';
   const [request, setRequest] = useState<AccessRequest | null>(null);
@@ -383,7 +384,7 @@ export function ClinicianWaitingScreen() {
           </Card>
           {request.status === 'approved' ? (
             <Button label="Open authorized patient" icon="user-check" onPress={openAuthorizedView} testID="open-approved-patient" />
-          ) : request.status === 'pending' ? (
+          ) : request.status === 'pending' && isDemoMode ? (
             <>
               <InfoBanner title="Demo consent step" body="Switch to the patient role on this device and approve or deny the request in Access & consent. This button never approves on the clinician’s behalf." icon="repeat" />
               <Button
@@ -396,6 +397,8 @@ export function ClinicianWaitingScreen() {
                 variant="secondary"
               />
             </>
+          ) : request.status === 'pending' ? (
+            <InfoBanner title="Awaiting patient consent" body="The patient must approve this request in their account. No records are available while consent is pending." icon="clock" />
           ) : (
             <Button label="Return to clinician home" icon="home" onPress={() => router.replace('/(clinician)/(tabs)' as never)} variant="outline" />
           )}
@@ -408,13 +411,14 @@ export function ClinicianWaitingScreen() {
 export function AuthorizedPatientScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { isDemoMode } = useAppContext();
   const [authorized, setAuthorized] = useState<AuthorizedPatient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await services.clinician.getAuthorizedPatient(DEMO_PATIENT_ID);
+      const next = await services.clinician.getAuthorizedPatient(isDemoMode ? DEMO_PATIENT_ID : '');
       setAuthorized(next);
       setError(null);
     } catch (cause) {
@@ -423,7 +427,7 @@ export function AuthorizedPatientScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isDemoMode]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return (
@@ -482,9 +486,9 @@ export function AuthorizedPatientScreen() {
           ) : null}
           <SectionTitle title="Document a visit" />
           <Card style={styles.actionList}>
-            <Button label="Create encounter" icon="file-plus" onPress={() => router.push('/(clinician)/encounter' as never)} variant="outline" />
-            <Button label="Create prescription" icon="clipboard" onPress={() => router.push('/(clinician)/prescription' as never)} variant="outline" />
-            <Button label="Add observation" icon="activity" onPress={() => router.push('/(clinician)/observation' as never)} variant="outline" />
+            <Button label="Create encounter" icon="file-plus" onPress={() => router.push({ pathname: '/(clinician)/encounter' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
+            <Button label="Create prescription" icon="clipboard" onPress={() => router.push({ pathname: '/(clinician)/prescription' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
+            <Button label="Add observation" icon="activity" onPress={() => router.push({ pathname: '/(clinician)/observation' as never, params: { patientId: authorized.patient.id } })} variant="outline" />
           </Card>
         </>
       )}
@@ -500,25 +504,32 @@ function AuthorizedForm({
 }: {
   title: string;
   subtitle: string;
-  onSave: () => Promise<void>;
+  onSave: (patientId: string) => Promise<void>;
   children: React.ReactNode;
 }) {
   const colors = useColors();
   const router = useRouter();
+  const { isDemoMode } = useAppContext();
+  const params = useLocalSearchParams<{ patientId?: string }>();
+  const patientId = typeof params.patientId === 'string' ? params.patientId : '';
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    services.clinician.getAuthorizedPatient(DEMO_PATIENT_ID)
+    if (!patientId) {
+      setAuthorized(false);
+      return;
+    }
+    services.clinician.getAuthorizedPatient(isDemoMode ? DEMO_PATIENT_ID : patientId)
       .then((result) => setAuthorized(Boolean(result)))
       .catch(() => setAuthorized(false));
-  }, []);
+  }, [isDemoMode, patientId]);
 
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
-      await onSave();
+      await onSave(patientId);
       router.back();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The record could not be saved.');
@@ -536,7 +547,7 @@ function AuthorizedForm({
         </>
       ) : (
         <>
-          <InfoBanner title="Grant verified" body="Access is re-checked by the mock service when you save. The server must enforce this again in production." tone="success" icon="shield" />
+          <InfoBanner title="Grant verified" body={isDemoMode ? 'Access is re-checked by the local demo service when you save.' : 'The server re-checks this grant, its scope, and expiry when you save.'} tone="success" icon="shield" />
           {error ? <InfoBanner title="Could not save" body={error} tone="warning" icon="alert-circle" /> : null}
           <Card>{children}</Card>
           <Button label="Save record" icon="check" onPress={() => void save()} loading={saving} testID="save-clinical-record" />
@@ -551,13 +562,13 @@ export function CreateEncounterScreen() {
   const [reason, setReason] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [validation, setValidation] = useState('');
-  const save = async () => {
+  const save = async (patientId: string) => {
     if (!diagnosis.trim() || !reason.trim() || !isValidDate(date)) {
       setValidation('Add a diagnosis, reason, and valid date in YYYY-MM-DD format.');
       throw new Error('Please complete all encounter fields with a valid date.');
     }
     setValidation('');
-    await services.clinician.createEncounter({ diagnosis: diagnosis.trim(), reason: reason.trim(), date });
+    await services.clinician.createEncounter({ patientId, diagnosis: diagnosis.trim(), reason: reason.trim(), date });
   };
   return (
     <AuthorizedForm title="Create encounter" subtitle="Document the patient visit within the approved grant." onSave={save}>
@@ -576,13 +587,14 @@ export function CreatePrescriptionScreen() {
   const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
   const [end, setEnd] = useState('');
   const [validation, setValidation] = useState('');
-  const save = async () => {
+  const save = async (patientId: string) => {
     if (!drug.trim() || !dose.trim() || !frequency.trim() || !isValidDate(start) || !isValidDate(end) || end < start) {
       setValidation('Complete each field. Enter valid dates and make sure the end date is on or after the start date.');
       throw new Error('Please review the prescription details.');
     }
     setValidation('');
     await services.clinician.createPrescription({
+      patientId,
       drug: drug.trim(),
       dose: dose.trim(),
       frequency: frequency.trim(),
@@ -608,13 +620,13 @@ export function CreateObservationScreen() {
   const [unit, setUnit] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [validation, setValidation] = useState('');
-  const save = async () => {
+  const save = async (patientId: string) => {
     if (!title.trim() || !value.trim() || !isValidDate(date)) {
       setValidation('Add a measurement, value, and valid date.');
       throw new Error('Please complete the observation details.');
     }
     setValidation('');
-    await services.clinician.createObservation({ title: title.trim(), value: value.trim(), unit: unit.trim(), date });
+    await services.clinician.createObservation({ patientId, title: title.trim(), value: value.trim(), unit: unit.trim(), date });
   };
   return (
     <AuthorizedForm title="Add observation" subtitle="Record a measurement or clinical observation." onSave={save}>

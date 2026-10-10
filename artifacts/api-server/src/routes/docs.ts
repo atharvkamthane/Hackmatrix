@@ -1,5 +1,37 @@
 import { Router, type IRouter } from "express";
 
+function authenticatedOperation(operationId: string, tag: string, summary: string, requestSchema?: string) {
+  return {
+    operationId,
+    tags: [tag],
+    summary,
+    security: [{ bearerAuth: [] }],
+    ...(requestSchema ? {
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: `#/components/schemas/${requestSchema}` } } },
+      },
+    } : {}),
+    responses: {
+      "200": { description: "Successful request", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiPayload" } } } },
+      "201": { description: "Resource created", content: { "application/json": { schema: { $ref: "#/components/schemas/ApiPayload" } } } },
+      "400": { description: "Invalid request", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+      "401": { description: "Unauthenticated", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+      "403": { description: "Role, organization, or consent denied", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+      "404": { description: "Resource not found", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+      "409": { description: "Request expired or no longer available", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+      "503": { description: "Database unavailable", content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+    },
+  };
+}
+
+const objectIdParameter = (name: string) => ({
+  name,
+  in: "path",
+  required: true,
+  schema: { type: "string", pattern: "^[a-fA-F0-9]{24}$" },
+});
+
 export const openApiSpec = {
   openapi: "3.1.0",
   info: {
@@ -11,6 +43,9 @@ export const openApiSpec = {
   tags: [
     { name: "system", description: "System health and readiness" },
     { name: "auth", description: "Authentication and server-controlled role verification" },
+    { name: "patient", description: "Patient-owned clinical data and consent" },
+    { name: "clinician", description: "Consent-controlled clinical workflows" },
+    { name: "admin", description: "Privacy-protected analytics and audit summaries" },
   ],
   paths: {
     "/healthz": {
@@ -241,6 +276,84 @@ export const openApiSpec = {
         },
       },
     },
+    "/access/overview": {
+      get: authenticatedOperation("getAccessOverview", "patient", "Get the caller's consent overview"),
+    },
+    "/patient/me": {
+      get: authenticatedOperation("getPatientProfile", "patient", "Get the authenticated patient's profile"),
+    },
+    "/patient/records": {
+      get: authenticatedOperation("getPatientRecords", "patient", "Get the authenticated patient's own records"),
+    },
+    "/patient/qr-token": {
+      get: authenticatedOperation("createPatientQrToken", "patient", "Create a short-lived, opaque QR token"),
+    },
+    "/patient/access-requests": {
+      get: authenticatedOperation("getPatientAccessRequests", "patient", "List access requests for the authenticated patient"),
+    },
+    "/patient/access-requests/{requestId}/decision": {
+      post: {
+        ...authenticatedOperation("decidePatientAccessRequest", "patient", "Approve or deny a pending access request", "AccessDecision"),
+        parameters: [objectIdParameter("requestId")],
+      },
+    },
+    "/patient/grants": {
+      get: authenticatedOperation("getPatientAccessGrants", "patient", "List access grants for the authenticated patient"),
+    },
+    "/patient/grants/{grantId}/revoke": {
+      post: {
+        ...authenticatedOperation("revokePatientAccessGrant", "patient", "Revoke an active access grant"),
+        parameters: [objectIdParameter("grantId")],
+      },
+    },
+    "/clinician/qr/resolve": {
+      post: authenticatedOperation("resolvePatientQrToken", "clinician", "Consume a patient QR token and create an access request", "QrResolve"),
+    },
+    "/clinician/access-requests/{requestId}": {
+      get: {
+        ...authenticatedOperation("getClinicianAccessRequest", "clinician", "Get a request created by the authenticated clinician"),
+        parameters: [objectIdParameter("requestId")],
+      },
+    },
+    "/clinician/patients": {
+      get: authenticatedOperation("getAuthorizedPatient", "clinician", "Get a patient covered by an active grant"),
+    },
+    "/clinician/patients/{patientId}": {
+      get: {
+        ...authenticatedOperation("getAuthorizedPatientById", "clinician", "Get a specified patient covered by an active grant"),
+        parameters: [objectIdParameter("patientId")],
+      },
+    },
+    "/clinician/encounters": {
+      post: authenticatedOperation("createEncounter", "clinician", "Create an encounter within an active visits grant", "EncounterInput"),
+    },
+    "/clinician/prescriptions": {
+      post: authenticatedOperation("createPrescription", "clinician", "Create a prescription within an active prescription grant", "PrescriptionInput"),
+    },
+    "/clinician/observations": {
+      post: authenticatedOperation("createObservation", "clinician", "Create an observation within an active labs grant", "ObservationInput"),
+    },
+    "/admin/summary": {
+      get: authenticatedOperation("getAdminSummary", "admin", "Get K-suppressed aggregate system summary"),
+    },
+    "/admin/trends": {
+      get: authenticatedOperation("getAdminTrends", "admin", "Query privacy-protected monthly disease trends"),
+    },
+    "/admin/regions": {
+      get: authenticatedOperation("getAdminRegions", "admin", "Get privacy-protected regional aggregates"),
+    },
+    "/admin/conditions": {
+      get: authenticatedOperation("getAdminConditions", "admin", "Get condition category aggregates"),
+    },
+    "/admin/privacy-config": {
+      get: authenticatedOperation("getAdminPrivacyConfig", "admin", "Get privacy threshold configuration and aggregate metrics"),
+    },
+    "/admin/audit": {
+      get: authenticatedOperation("getAdminAuditEvents", "admin", "Get paginated metadata-only audit events"),
+    },
+    "/admin/security-events": {
+      get: authenticatedOperation("getAdminSecurityEvents", "admin", "Get safe security event summaries"),
+    },
   },
   components: {
     securitySchemes: {
@@ -270,6 +383,7 @@ export const openApiSpec = {
           userId: { type: "string", example: "user_2sA19x..." },
           role: { type: "string", enum: ["PATIENT", "CLINICIAN", "ADMIN"], example: "PATIENT" },
           organizationId: { type: "string", nullable: true, example: "org_2sB84k..." },
+          capabilities: { type: "array", items: { type: "string" }, example: ["clinical:read:self", "consent:manage:self"] },
         },
         required: ["userId", "role"],
       },
@@ -285,6 +399,59 @@ export const openApiSpec = {
         type: "object",
         properties: { status: { type: "string", example: "ok" } },
         required: ["status"],
+      },
+      ApiPayload: {
+        oneOf: [
+          { type: "object", additionalProperties: true },
+          { type: "array", items: { type: "object", additionalProperties: true } },
+        ],
+      },
+      AccessDecision: {
+        type: "object",
+        properties: { decision: { type: "string", enum: ["approved", "denied"] } },
+        required: ["decision"],
+      },
+      QrResolve: {
+        type: "object",
+        properties: {
+          token: { type: "string", maxLength: 128 },
+          scopes: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true, items: { type: "string", enum: ["visits", "prescriptions", "labs"] } },
+          durationMinutes: { type: "integer", minimum: 5, maximum: 240, default: 60 },
+        },
+        required: ["token"],
+      },
+      EncounterInput: {
+        type: "object",
+        properties: {
+          patientId: { type: "string", pattern: "^[a-fA-F0-9]{24}$" },
+          diagnosis: { type: "string", maxLength: 200 },
+          reason: { type: "string", maxLength: 500 },
+          date: { type: "string", format: "date" },
+        },
+        required: ["patientId", "diagnosis", "reason", "date"],
+      },
+      PrescriptionInput: {
+        type: "object",
+        properties: {
+          patientId: { type: "string", pattern: "^[a-fA-F0-9]{24}$" },
+          drug: { type: "string", maxLength: 200 },
+          dose: { type: "string", maxLength: 120 },
+          frequency: { type: "string", maxLength: 120 },
+          start: { type: "string", format: "date" },
+          end: { type: "string", format: "date" },
+        },
+        required: ["patientId", "drug", "dose", "frequency", "start", "end"],
+      },
+      ObservationInput: {
+        type: "object",
+        properties: {
+          patientId: { type: "string", pattern: "^[a-fA-F0-9]{24}$" },
+          title: { type: "string", maxLength: 200 },
+          value: { type: "string", maxLength: 200 },
+          unit: { type: "string", maxLength: 80 },
+          date: { type: "string", format: "date" },
+        },
+        required: ["patientId", "title", "value", "unit", "date"],
       },
       ErrorResponse: {
         type: "object",
