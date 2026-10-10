@@ -27,12 +27,13 @@ export interface AppContextValue {
   authMode: AuthMode | null;
   isDemoMode: boolean;
   role: Role | null;
+  userName: string | null;
   serverIdentity: AuthenticatedIdentity | null;
   isReady: boolean;
   data: DemoAccessOverview | null;
   error: string | null;
   signIn: (role: Role) => Promise<void>;
-  signInDemo: (role: Role) => Promise<void>;
+  signInDemo: (role: Role, customProfile?: { name: string; detail?: string }) => Promise<void>;
   signInProduction: () => Promise<void>;
   signOut: () => Promise<void>;
   switchDemoRole: () => Promise<void>;
@@ -45,6 +46,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [role, setRole] = useState<Role | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [serverIdentity, setServerIdentity] = useState<AuthenticatedIdentity | null>(null);
   const [data, setData] = useState<DemoAccessOverview | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -89,6 +91,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (session?.role) {
             setAuthMode('demo');
             setRole(session.role);
+            setUserName(session.name ?? null);
             setData(demoOverview);
           }
         } else if (savedMode === 'production') {
@@ -99,11 +102,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setAuthMode('production');
             setServerIdentity(identity);
             setRole(getMobileRole(identity));
+            setUserName(null);
             setData(accessOverview);
           } catch (prodErr) {
             if (!mounted) return;
-            setAuthMode('production');
+            await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
+            setAuthMode(null);
             setRole(null);
+            setUserName(null);
             setServerIdentity(null);
             setData(null);
             setError(prodErr instanceof Error ? prodErr.message : 'Production session expired.');
@@ -123,12 +129,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signInDemo = useCallback(async (nextRole: Role) => {
+  const signInDemo = useCallback(async (nextRole: Role, customProfile?: { name: string; detail?: string }) => {
     try {
       await AsyncStorage.setItem(AUTH_MODE_KEY, 'demo');
-      const session = await services.auth.signIn(nextRole);
+      const session = await services.auth.signIn(nextRole, customProfile);
       setAuthMode('demo');
       setRole(session.role);
+      setUserName(session.name ?? null);
       setServerIdentity(null);
       setError(null);
       const demoOverview = await services.patient.getDemoOverview();
@@ -151,11 +158,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAuthMode('production');
       setServerIdentity(identity);
       setRole(appRole);
+      setUserName(null);
       setData(accessOverview);
     } catch (cause) {
       const msg = cause instanceof Error ? cause.message : 'Production sign-in failed.';
-      setAuthMode('production');
+      await AsyncStorage.removeItem(AUTH_MODE_KEY).catch(() => {});
+      setAuthMode(null);
       setRole(null);
+      setUserName(null);
       setServerIdentity(null);
       setData(null);
       setError(msg);
@@ -166,26 +176,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(AUTH_MODE_KEY);
-      if (authMode === 'demo') {
-        await services.auth.signOut();
-      } else {
-        try {
-          const clerk = getClerkInstance();
-          if (clerk?.signOut) {
-            await clerk.signOut();
-          }
-        } catch {
-          // Ignore Clerk sign-out failure on unmounted or offline instances
+      await services.auth.signOut().catch(() => {});
+      try {
+        const clerk = getClerkInstance();
+        if (clerk?.signOut) {
+          await clerk.signOut();
         }
+      } catch {
+        // Ignore Clerk sign-out failure on unmounted or offline instances
       }
     } finally {
       setAuthMode(null);
       setRole(null);
+      setUserName(null);
       setServerIdentity(null);
       setData(null);
       setError(null);
     }
-  }, [authMode]);
+  }, []);
 
   const switchDemoRole = useCallback(async () => {
     if (authMode !== 'demo') {
@@ -194,6 +202,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const nextRole: Role = role === 'patient' ? 'clinician' : 'patient';
     const session = await services.auth.signIn(nextRole);
     setRole(session.role);
+    setUserName(session.name ?? null);
     const demoOverview = await services.patient.getDemoOverview();
     setData(demoOverview);
   }, [authMode, role]);
@@ -203,6 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authMode,
       isDemoMode: authMode === 'demo',
       role,
+      userName,
       serverIdentity,
       isReady,
       data,
@@ -215,7 +225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refresh,
       clearError,
     }),
-    [authMode, clearError, data, error, isReady, refresh, role, serverIdentity, signIn, signInDemo, signInProduction, signOut, switchDemoRole],
+    [authMode, clearError, data, error, isReady, refresh, role, userName, serverIdentity, signIn, signInDemo, signInProduction, signOut, switchDemoRole],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
