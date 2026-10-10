@@ -516,7 +516,7 @@ export function createClinicalRouter(
     }
   });
 
-  router.get("/clinician/patients/:patientId?", auth, async (req, res, next) => {
+  router.get(["/clinician/patients", "/clinician/patients/:patientId"], auth, async (req, res, next) => {
     try {
       if (req.auth?.role !== "CLINICIAN") return responseError(res, 403, "FORBIDDEN", "Clinician access is required.");
       const user = await findUser(req, "CLINICIAN");
