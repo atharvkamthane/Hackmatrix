@@ -5,8 +5,9 @@ import type { DatabaseConnections } from "../db";
 import { createClinicalModels, clinicalScopes, type ClinicalScope } from "../models/clinical";
 import { requireRole, type Role } from "../auth";
 
-const QR_TTL_MS = 10 * 60 * 1000;
-const REQUEST_TTL_MS = 10 * 60 * 1000;
+const QR_TTL_MS = 60 * 1000;
+const REQUEST_TTL_MS = 2 * 60 * 1000;
+export const PERMITTED_DURATIONS = [15, 30, 60] as const;
 const DEFAULT_GRANT_MINUTES = 60;
 const MAX_LIST_SIZE = 100;
 const scopeLabels: Record<ClinicalScope, string[]> = {
@@ -442,8 +443,13 @@ export function createClinicalRouter(
           : [];
       const durationInput = req.body?.durationMinutes;
       const requestedDurationMinutes = durationInput === undefined ? DEFAULT_GRANT_MINUTES : durationInput;
-      if (requestedScopes.length === 0 || typeof requestedDurationMinutes !== "number" || !Number.isInteger(requestedDurationMinutes) || requestedDurationMinutes < 5 || requestedDurationMinutes > 240) {
-        return responseError(res, 400, "INVALID_ACCESS_REQUEST", "Choose valid access scopes and a duration between 5 and 240 minutes.");
+      if (
+        requestedScopes.length === 0 ||
+        typeof requestedDurationMinutes !== "number" ||
+        !Number.isInteger(requestedDurationMinutes) ||
+        !PERMITTED_DURATIONS.includes(requestedDurationMinutes as (typeof PERMITTED_DURATIONS)[number])
+      ) {
+        return responseError(res, 400, "INVALID_ACCESS_REQUEST", "Choose valid access scopes and a permitted duration of 15, 30, or 60 minutes.");
       }
       const user = await findUser(req, "CLINICIAN");
       const clinician = user && await findClinicianForUser(user);

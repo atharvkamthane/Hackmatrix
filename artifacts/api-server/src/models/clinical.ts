@@ -206,7 +206,7 @@ const accessRequestSchema = new Schema(
       index: true,
     },
     createdAt: { type: Date, required: true, default: Date.now },
-    requestedDurationMinutes: { type: Number, required: true, min: 5, max: 1440, default: 60 },
+    requestedDurationMinutes: { type: Number, required: true, enum: [15, 30, 60], default: 60 },
     expiresAt: { type: Date, required: true },
     decidedAt: Date,
     decision: decisionSchema,

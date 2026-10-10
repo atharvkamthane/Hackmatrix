@@ -66,6 +66,30 @@ test("access requests and grants require explicit scopes", () => {
   assert.deepEqual(clinicalScopes, ["visits", "prescriptions", "labs"]);
 });
 
+test("access requests enforce permitted durations of 15, 30, and 60 minutes", () => {
+  for (const duration of [15, 30, 60]) {
+    const validRequest = new models.AccessRequest({
+      patientId,
+      clinicianId,
+      organizationId,
+      requestedScopes: ["visits"],
+      requestedDurationMinutes: duration,
+      expiresAt: new Date("2030-01-01"),
+    });
+    assert.equal(validRequest.validateSync(), undefined);
+  }
+
+  const invalidRequest = new models.AccessRequest({
+    patientId,
+    clinicianId,
+    organizationId,
+    requestedScopes: ["visits"],
+    requestedDurationMinutes: 45,
+    expiresAt: new Date("2030-01-01"),
+  });
+  assert.notEqual(invalidRequest.validateSync(), undefined);
+});
+
 test("expired and revoked grants are representable without changing patient identity", () => {
   const grant = new models.AccessGrant({
     patientId,

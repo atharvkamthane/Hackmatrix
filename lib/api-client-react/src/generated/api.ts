@@ -5,7 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   MutationFunction,
   QueryFunction,
@@ -13,8 +16,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   AccessDecision,
@@ -29,27 +32,27 @@ import type {
   PrescriptionInput,
   QrResolve,
   ReadinessStatus,
-  UnauthenticatedResponse,
-} from "./api.schemas";
+  UnauthenticatedResponse
+} from './api.schemas';
 
-import { customFetch } from "../custom-fetch";
-import type { ErrorType, BodyType } from "../custom-fetch";
+import { customFetch } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
-type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
+      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-const withQueryKey = <T extends object, K>(
-  query: T,
-  queryKey: K,
-): T & { queryKey: K } => {
+
+
+const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
   const result = { queryKey } as T & { queryKey: K };
   for (const key of Object.keys(query)) {
     // The explicit queryKey always wins, matching the previous
     // `{ ...query, queryKey }` spread where it was set last.
-    if (key === "queryKey") continue;
+    if (key === 'queryKey') continue;
     Object.defineProperty(result, key, {
       enumerable: true,
       configurable: true,
@@ -60,2189 +63,1988 @@ const withQueryKey = <T extends object, K>(
 };
 
 export const getHealthCheckUrl = () => {
-  return `/api/healthz`;
-};
+
+
+
+
+  return `/api/healthz`
+}
 
 /**
  * Returns server health status
  * @summary Health check
  */
-export const healthCheck = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<HealthStatus> => {
-  return customFetch<HealthStatus>(getHealthCheckUrl(), {
+export const healthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<HealthStatus> => {
+
+  return customFetch<HealthStatus>(getHealthCheckUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getHealthCheckQueryKey = () => {
-  return [`/api/healthz`] as const;
-};
+    return [
+    `/api/healthz`
+    ] as const;
+    }
 
-export const getHealthCheckQueryOptions = <
-  TData = Awaited<ReturnType<typeof healthCheck>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof healthCheck>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getHealthCheckQueryKey();
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({
-    signal,
-  }) => healthCheck({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof healthCheck>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
-export type HealthCheckQueryResult = NonNullable<
-  Awaited<ReturnType<typeof healthCheck>>
->;
-export type HealthCheckQueryError = ErrorType<unknown>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
+export type HealthCheckQueryError = ErrorType<unknown>
+
 
 /**
  * @summary Health check
  */
 
-export function useHealthCheck<
-  TData = Awaited<ReturnType<typeof healthCheck>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof healthCheck>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getHealthCheckQueryOptions(options);
+export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getReadinessCheckUrl = () => {
-  return `/api/readyz`;
-};
+
+
+
+
+  return `/api/readyz`
+}
 
 /**
  * @summary Check MongoDB readiness
  */
-export const readinessCheck = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ReadinessStatus> => {
-  return customFetch<ReadinessStatus>(getReadinessCheckUrl(), {
+export const readinessCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<ReadinessStatus> => {
+
+  return customFetch<ReadinessStatus>(getReadinessCheckUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getReadinessCheckQueryKey = () => {
-  return [`/api/readyz`] as const;
-};
+    return [
+    `/api/readyz`
+    ] as const;
+    }
 
-export const getReadinessCheckQueryOptions = <
-  TData = Awaited<ReturnType<typeof readinessCheck>>,
-  TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof readinessCheck>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getReadinessCheckQueryKey();
+export const getReadinessCheckQueryOptions = <TData = Awaited<ReturnType<typeof readinessCheck>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof readinessCheck>>> = ({
-    signal,
-  }) => readinessCheck({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof readinessCheck>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getReadinessCheckQueryKey();
 
-export type ReadinessCheckQueryResult = NonNullable<
-  Awaited<ReturnType<typeof readinessCheck>>
->;
-export type ReadinessCheckQueryError = ErrorType<void>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof readinessCheck>>> = ({ signal }) => readinessCheck({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ReadinessCheckQueryResult = NonNullable<Awaited<ReturnType<typeof readinessCheck>>>
+export type ReadinessCheckQueryError = ErrorType<void>
+
 
 /**
  * @summary Check MongoDB readiness
  */
 
-export function useReadinessCheck<
-  TData = Awaited<ReturnType<typeof readinessCheck>>,
-  TError = ErrorType<void>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof readinessCheck>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getReadinessCheckQueryOptions(options);
+export function useReadinessCheck<TData = Awaited<ReturnType<typeof readinessCheck>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof readinessCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getReadinessCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAuthenticatedUserUrl = () => {
-  return `/api/auth/me`;
-};
+
+
+
+
+  return `/api/auth/me`
+}
 
 /**
  * @summary Get the verified profile, role, and capabilities
  */
-export const getAuthenticatedUser = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<AuthMeResponse> => {
-  return customFetch<AuthMeResponse>(getGetAuthenticatedUserUrl(), {
+export const getAuthenticatedUser = async ( options?: Parameters<typeof customFetch>[1]): Promise<AuthMeResponse> => {
+
+  return customFetch<AuthMeResponse>(getGetAuthenticatedUserUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAuthenticatedUserQueryKey = () => {
-  return [`/api/auth/me`] as const;
-};
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
 
-export const getGetAuthenticatedUserQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAuthenticatedUser>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthenticatedUser>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAuthenticatedUserQueryKey();
+export const getGetAuthenticatedUserQueryOptions = <TData = Awaited<ReturnType<typeof getAuthenticatedUser>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthenticatedUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAuthenticatedUser>>
-  > = ({ signal }) => getAuthenticatedUser({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthenticatedUser>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthenticatedUserQueryKey();
 
-export type GetAuthenticatedUserQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAuthenticatedUser>>
->;
-export type GetAuthenticatedUserQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthenticatedUser>>> = ({ signal }) => getAuthenticatedUser({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthenticatedUser>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuthenticatedUserQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthenticatedUser>>>
+export type GetAuthenticatedUserQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get the verified profile, role, and capabilities
  */
 
-export function useGetAuthenticatedUser<
-  TData = Awaited<ReturnType<typeof getAuthenticatedUser>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthenticatedUser>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAuthenticatedUserQueryOptions(options);
+export function useGetAuthenticatedUser<TData = Awaited<ReturnType<typeof getAuthenticatedUser>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthenticatedUser>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuthenticatedUserQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAccessOverviewUrl = () => {
-  return `/api/access/overview`;
-};
+
+
+
+
+  return `/api/access/overview`
+}
 
 /**
  * @summary Get the caller's consent overview
  */
-export const getAccessOverview = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAccessOverviewUrl(), {
+export const getAccessOverview = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAccessOverviewUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAccessOverviewQueryKey = () => {
-  return [`/api/access/overview`] as const;
-};
+    return [
+    `/api/access/overview`
+    ] as const;
+    }
 
-export const getGetAccessOverviewQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAccessOverview>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAccessOverview>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAccessOverviewQueryKey();
+export const getGetAccessOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getAccessOverview>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccessOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAccessOverview>>
-  > = ({ signal }) => getAccessOverview({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAccessOverview>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAccessOverviewQueryKey();
 
-export type GetAccessOverviewQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAccessOverview>>
->;
-export type GetAccessOverviewQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccessOverview>>> = ({ signal }) => getAccessOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccessOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccessOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAccessOverview>>>
+export type GetAccessOverviewQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get the caller's consent overview
  */
 
-export function useGetAccessOverview<
-  TData = Awaited<ReturnType<typeof getAccessOverview>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAccessOverview>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAccessOverviewQueryOptions(options);
+export function useGetAccessOverview<TData = Awaited<ReturnType<typeof getAccessOverview>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccessOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccessOverviewQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetPatientProfileUrl = () => {
-  return `/api/patient/me`;
-};
+
+
+
+
+  return `/api/patient/me`
+}
 
 /**
  * @summary Get the authenticated patient's profile
  */
-export const getPatientProfile = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetPatientProfileUrl(), {
+export const getPatientProfile = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetPatientProfileUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetPatientProfileQueryKey = () => {
-  return [`/api/patient/me`] as const;
-};
+    return [
+    `/api/patient/me`
+    ] as const;
+    }
 
-export const getGetPatientProfileQueryOptions = <
-  TData = Awaited<ReturnType<typeof getPatientProfile>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientProfile>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetPatientProfileQueryKey();
+export const getGetPatientProfileQueryOptions = <TData = Awaited<ReturnType<typeof getPatientProfile>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getPatientProfile>>
-  > = ({ signal }) => getPatientProfile({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientProfile>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientProfileQueryKey();
 
-export type GetPatientProfileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getPatientProfile>>
->;
-export type GetPatientProfileQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientProfile>>> = ({ signal }) => getPatientProfile({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientProfile>>>
+export type GetPatientProfileQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get the authenticated patient's profile
  */
 
-export function useGetPatientProfile<
-  TData = Awaited<ReturnType<typeof getPatientProfile>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientProfile>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPatientProfileQueryOptions(options);
+export function useGetPatientProfile<TData = Awaited<ReturnType<typeof getPatientProfile>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientProfileQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetPatientRecordsUrl = () => {
-  return `/api/patient/records`;
-};
+
+
+
+
+  return `/api/patient/records`
+}
 
 /**
  * @summary Get the authenticated patient's own clinical records
  */
-export const getPatientRecords = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetPatientRecordsUrl(), {
+export const getPatientRecords = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetPatientRecordsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetPatientRecordsQueryKey = () => {
-  return [`/api/patient/records`] as const;
-};
+    return [
+    `/api/patient/records`
+    ] as const;
+    }
 
-export const getGetPatientRecordsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getPatientRecords>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientRecords>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetPatientRecordsQueryKey();
+export const getGetPatientRecordsQueryOptions = <TData = Awaited<ReturnType<typeof getPatientRecords>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getPatientRecords>>
-  > = ({ signal }) => getPatientRecords({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientRecords>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientRecordsQueryKey();
 
-export type GetPatientRecordsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getPatientRecords>>
->;
-export type GetPatientRecordsQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientRecords>>> = ({ signal }) => getPatientRecords({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientRecords>>>
+export type GetPatientRecordsQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get the authenticated patient's own clinical records
  */
 
-export function useGetPatientRecords<
-  TData = Awaited<ReturnType<typeof getPatientRecords>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientRecords>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPatientRecordsQueryOptions(options);
+export function useGetPatientRecords<TData = Awaited<ReturnType<typeof getPatientRecords>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientRecordsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getCreatePatientQrTokenUrl = () => {
-  return `/api/patient/qr-token`;
-};
+
+
+
+
+  return `/api/patient/qr-token`
+}
 
 /**
  * @summary Create a single-use, short-lived QR token
  */
-export const createPatientQrToken = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getCreatePatientQrTokenUrl(), {
+export const createPatientQrToken = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getCreatePatientQrTokenUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getCreatePatientQrTokenQueryKey = () => {
-  return [`/api/patient/qr-token`] as const;
-};
+    return [
+    `/api/patient/qr-token`
+    ] as const;
+    }
 
-export const getCreatePatientQrTokenQueryOptions = <
-  TData = Awaited<ReturnType<typeof createPatientQrToken>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof createPatientQrToken>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getCreatePatientQrTokenQueryKey();
+export const getCreatePatientQrTokenQueryOptions = <TData = Awaited<ReturnType<typeof createPatientQrToken>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof createPatientQrToken>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof createPatientQrToken>>
-  > = ({ signal }) => createPatientQrToken({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof createPatientQrToken>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getCreatePatientQrTokenQueryKey();
 
-export type CreatePatientQrTokenQueryResult = NonNullable<
-  Awaited<ReturnType<typeof createPatientQrToken>>
->;
-export type CreatePatientQrTokenQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof createPatientQrToken>>> = ({ signal }) => createPatientQrToken({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof createPatientQrToken>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CreatePatientQrTokenQueryResult = NonNullable<Awaited<ReturnType<typeof createPatientQrToken>>>
+export type CreatePatientQrTokenQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Create a single-use, short-lived QR token
  */
 
-export function useCreatePatientQrToken<
-  TData = Awaited<ReturnType<typeof createPatientQrToken>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof createPatientQrToken>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getCreatePatientQrTokenQueryOptions(options);
+export function useCreatePatientQrToken<TData = Awaited<ReturnType<typeof createPatientQrToken>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof createPatientQrToken>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCreatePatientQrTokenQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetPatientAccessRequestsUrl = () => {
-  return `/api/patient/access-requests`;
-};
+
+
+
+
+  return `/api/patient/access-requests`
+}
 
 /**
  * @summary List the patient's access requests
  */
-export const getPatientAccessRequests = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetPatientAccessRequestsUrl(), {
+export const getPatientAccessRequests = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetPatientAccessRequestsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetPatientAccessRequestsQueryKey = () => {
-  return [`/api/patient/access-requests`] as const;
-};
+    return [
+    `/api/patient/access-requests`
+    ] as const;
+    }
 
-export const getGetPatientAccessRequestsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getPatientAccessRequests>>,
-  TError = ErrorType<UnauthenticatedResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientAccessRequests>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetPatientAccessRequestsQueryKey();
+export const getGetPatientAccessRequestsQueryOptions = <TData = Awaited<ReturnType<typeof getPatientAccessRequests>>, TError = ErrorType<UnauthenticatedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientAccessRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getPatientAccessRequests>>
-  > = ({ signal }) => getPatientAccessRequests({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientAccessRequests>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientAccessRequestsQueryKey();
 
-export type GetPatientAccessRequestsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getPatientAccessRequests>>
->;
-export type GetPatientAccessRequestsQueryError =
-  ErrorType<UnauthenticatedResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientAccessRequests>>> = ({ signal }) => getPatientAccessRequests({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientAccessRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientAccessRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientAccessRequests>>>
+export type GetPatientAccessRequestsQueryError = ErrorType<UnauthenticatedResponse>
+
 
 /**
  * @summary List the patient's access requests
  */
 
-export function useGetPatientAccessRequests<
-  TData = Awaited<ReturnType<typeof getPatientAccessRequests>>,
-  TError = ErrorType<UnauthenticatedResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientAccessRequests>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPatientAccessRequestsQueryOptions(options);
+export function useGetPatientAccessRequests<TData = Awaited<ReturnType<typeof getPatientAccessRequests>>, TError = ErrorType<UnauthenticatedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientAccessRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientAccessRequestsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getDecidePatientAccessRequestUrl = (requestId: string) => {
-  return `/api/patient/access-requests/${requestId}/decision`;
-};
+
+
+
+
+
+
+export const getDecidePatientAccessRequestUrl = (requestId: string,) => {
+
+
+
+
+  return `/api/patient/access-requests/${requestId}/decision`
+}
 
 /**
  * @summary Approve or deny a pending request
  */
-export const decidePatientAccessRequest = async (
-  requestId: string,
-  accessDecision: AccessDecision,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const decidePatientAccessRequest = async (requestId: string,
+    accessDecision: AccessDecision, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-  return customFetch<ApiSuccessResponse>(
-    getDecidePatientAccessRequestUrl(requestId),
-    {
-      ...options,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getHeaders(options?.headers),
-      },
-      body: JSON.stringify(accessDecision),
-    },
-  );
-};
+return customFetch<ApiSuccessResponse>(getDecidePatientAccessRequestUrl(requestId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accessDecision)
+  }
+);}
 
-export const getDecidePatientAccessRequestMutationKey = () =>
-  ["decidePatientAccessRequest"] as const;
 
-export const getDecidePatientAccessRequestMutationOptions = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void
-  >,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof decidePatientAccessRequest>>,
-    TError,
-    DecidePatientAccessRequestMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof decidePatientAccessRequest>>,
-  TError,
-  DecidePatientAccessRequestMutationVariables,
-  TContext
-> => {
-  const mutationKey = getDecidePatientAccessRequestMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof decidePatientAccessRequest>>,
-    DecidePatientAccessRequestMutationVariables
-  > = (props) => {
-    const { requestId, data } = props ?? {};
 
-    return decidePatientAccessRequest(requestId, data, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
+export const getDecidePatientAccessRequestMutationKey = () => ['decidePatientAccessRequest'] as const;
 
-export type DecidePatientAccessRequestMutationResult = NonNullable<
-  Awaited<ReturnType<typeof decidePatientAccessRequest>>
->;
-export type DecidePatientAccessRequestMutationBody = BodyType<AccessDecision>;
-export type DecidePatientAccessRequestMutationError = ErrorType<
-  BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void
->;
-export type DecidePatientAccessRequestMutationVariables = {
-  requestId: string;
-  data: BodyType<AccessDecision>;
-};
+export const getDecidePatientAccessRequestMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decidePatientAccessRequest>>, TError,DecidePatientAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decidePatientAccessRequest>>, TError,DecidePatientAccessRequestMutationVariables, TContext> => {
 
-/**
+const mutationKey = getDecidePatientAccessRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decidePatientAccessRequest>>, DecidePatientAccessRequestMutationVariables> = (props) => {
+          const {requestId,data} = props ?? {};
+
+          return  decidePatientAccessRequest(requestId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecidePatientAccessRequestMutationResult = NonNullable<Awaited<ReturnType<typeof decidePatientAccessRequest>>>
+    export type DecidePatientAccessRequestMutationBody = BodyType<AccessDecision>
+    export type DecidePatientAccessRequestMutationError = ErrorType<BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void>
+    export type DecidePatientAccessRequestMutationVariables = {requestId: string;data: BodyType<AccessDecision>}
+
+    /**
  * @summary Approve or deny a pending request
  */
-export const useDecidePatientAccessRequest = <
-  TError = ErrorType<
-    BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void
-  >,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof decidePatientAccessRequest>>,
-    TError,
-    DecidePatientAccessRequestMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof decidePatientAccessRequest>>,
-  TError,
-  DecidePatientAccessRequestMutationVariables,
-  TContext
-> => {
-  return useMutation(getDecidePatientAccessRequestMutationOptions(options));
-};
+export const useDecidePatientAccessRequest = <TError = ErrorType<BadRequestResponse | UnauthenticatedResponse | ForbiddenResponse | void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decidePatientAccessRequest>>, TError,DecidePatientAccessRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decidePatientAccessRequest>>,
+        TError,
+        DecidePatientAccessRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecidePatientAccessRequestMutationOptions(options));
+    }
 
 export const getGetPatientGrantsUrl = () => {
-  return `/api/patient/grants`;
-};
+
+
+
+
+  return `/api/patient/grants`
+}
 
 /**
  * @summary List the patient's consent grants
  */
-export const getPatientGrants = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetPatientGrantsUrl(), {
+export const getPatientGrants = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetPatientGrantsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetPatientGrantsQueryKey = () => {
-  return [`/api/patient/grants`] as const;
-};
+    return [
+    `/api/patient/grants`
+    ] as const;
+    }
 
-export const getGetPatientGrantsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getPatientGrants>>,
-  TError = ErrorType<UnauthenticatedResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientGrants>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetPatientGrantsQueryKey();
+export const getGetPatientGrantsQueryOptions = <TData = Awaited<ReturnType<typeof getPatientGrants>>, TError = ErrorType<UnauthenticatedResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientGrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getPatientGrants>>
-  > = ({ signal }) => getPatientGrants({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientGrants>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientGrantsQueryKey();
 
-export type GetPatientGrantsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getPatientGrants>>
->;
-export type GetPatientGrantsQueryError = ErrorType<UnauthenticatedResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientGrants>>> = ({ signal }) => getPatientGrants({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientGrants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientGrantsQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientGrants>>>
+export type GetPatientGrantsQueryError = ErrorType<UnauthenticatedResponse>
+
 
 /**
  * @summary List the patient's consent grants
  */
 
-export function useGetPatientGrants<
-  TData = Awaited<ReturnType<typeof getPatientGrants>>,
-  TError = ErrorType<UnauthenticatedResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getPatientGrants>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPatientGrantsQueryOptions(options);
+export function useGetPatientGrants<TData = Awaited<ReturnType<typeof getPatientGrants>>, TError = ErrorType<UnauthenticatedResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientGrants>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientGrantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getRevokePatientGrantUrl = (grantId: string) => {
-  return `/api/patient/grants/${grantId}/revoke`;
-};
+
+
+
+
+
+
+export const getRevokePatientGrantUrl = (grantId: string,) => {
+
+
+
+
+  return `/api/patient/grants/${grantId}/revoke`
+}
 
 /**
  * @summary Revoke an active consent grant
  */
-export const revokePatientGrant = async (
-  grantId: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getRevokePatientGrantUrl(grantId), {
+export const revokePatientGrant = async (grantId: string, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getRevokePatientGrantUrl(grantId),
+  {
     ...options,
-    method: "POST",
-  });
-};
+    method: 'POST'
 
-export const getRevokePatientGrantMutationKey = () =>
-  ["revokePatientGrant"] as const;
 
-export const getRevokePatientGrantMutationOptions = <
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof revokePatientGrant>>,
-    TError,
-    RevokePatientGrantMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof revokePatientGrant>>,
-  TError,
-  RevokePatientGrantMutationVariables,
-  TContext
-> => {
-  const mutationKey = getRevokePatientGrantMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
+  }
+);}
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof revokePatientGrant>>,
-    RevokePatientGrantMutationVariables
-  > = (props) => {
-    const { grantId } = props ?? {};
 
-    return revokePatientGrant(grantId, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
 
-export type RevokePatientGrantMutationResult = NonNullable<
-  Awaited<ReturnType<typeof revokePatientGrant>>
->;
 
-export type RevokePatientGrantMutationError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
-export type RevokePatientGrantMutationVariables = { grantId: string };
+export const getRevokePatientGrantMutationKey = () => ['revokePatientGrant'] as const;
 
-/**
+export const getRevokePatientGrantMutationOptions = <TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokePatientGrant>>, TError,RevokePatientGrantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokePatientGrant>>, TError,RevokePatientGrantMutationVariables, TContext> => {
+
+const mutationKey = getRevokePatientGrantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokePatientGrant>>, RevokePatientGrantMutationVariables> = (props) => {
+          const {grantId} = props ?? {};
+
+          return  revokePatientGrant(grantId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokePatientGrantMutationResult = NonNullable<Awaited<ReturnType<typeof revokePatientGrant>>>
+
+    export type RevokePatientGrantMutationError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+    export type RevokePatientGrantMutationVariables = {grantId: string}
+
+    /**
  * @summary Revoke an active consent grant
  */
-export const useRevokePatientGrant = <
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof revokePatientGrant>>,
-    TError,
-    RevokePatientGrantMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof revokePatientGrant>>,
-  TError,
-  RevokePatientGrantMutationVariables,
-  TContext
-> => {
-  return useMutation(getRevokePatientGrantMutationOptions(options));
-};
+export const useRevokePatientGrant = <TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokePatientGrant>>, TError,RevokePatientGrantMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokePatientGrant>>,
+        TError,
+        RevokePatientGrantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokePatientGrantMutationOptions(options));
+    }
 
 export const getResolvePatientQrTokenUrl = () => {
-  return `/api/clinician/qr/resolve`;
-};
+
+
+
+
+  return `/api/clinician/qr/resolve`
+}
 
 /**
  * @summary Consume a QR token and create a consent request
  */
-export const resolvePatientQrToken = async (
-  qrResolve: QrResolve,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const resolvePatientQrToken = async (qrResolve: QrResolve, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-  return customFetch<ApiSuccessResponse>(getResolvePatientQrTokenUrl(), {
+return customFetch<ApiSuccessResponse>(getResolvePatientQrTokenUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getHeaders(options?.headers),
-    },
-    body: JSON.stringify(qrResolve),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(qrResolve)
+  }
+);}
 
-export const getResolvePatientQrTokenMutationKey = () =>
-  ["resolvePatientQrToken"] as const;
 
-export const getResolvePatientQrTokenMutationOptions = <
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof resolvePatientQrToken>>,
-    TError,
-    ResolvePatientQrTokenMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof resolvePatientQrToken>>,
-  TError,
-  ResolvePatientQrTokenMutationVariables,
-  TContext
-> => {
-  const mutationKey = getResolvePatientQrTokenMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof resolvePatientQrToken>>,
-    ResolvePatientQrTokenMutationVariables
-  > = (props) => {
-    const { data } = props ?? {};
 
-    return resolvePatientQrToken(data, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
+export const getResolvePatientQrTokenMutationKey = () => ['resolvePatientQrToken'] as const;
 
-export type ResolvePatientQrTokenMutationResult = NonNullable<
-  Awaited<ReturnType<typeof resolvePatientQrToken>>
->;
-export type ResolvePatientQrTokenMutationBody = BodyType<QrResolve>;
-export type ResolvePatientQrTokenMutationError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
-export type ResolvePatientQrTokenMutationVariables = {
-  data: BodyType<QrResolve>;
-};
+export const getResolvePatientQrTokenMutationOptions = <TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePatientQrToken>>, TError,ResolvePatientQrTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolvePatientQrToken>>, TError,ResolvePatientQrTokenMutationVariables, TContext> => {
 
-/**
+const mutationKey = getResolvePatientQrTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolvePatientQrToken>>, ResolvePatientQrTokenMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  resolvePatientQrToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolvePatientQrTokenMutationResult = NonNullable<Awaited<ReturnType<typeof resolvePatientQrToken>>>
+    export type ResolvePatientQrTokenMutationBody = BodyType<QrResolve>
+    export type ResolvePatientQrTokenMutationError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+    export type ResolvePatientQrTokenMutationVariables = {data: BodyType<QrResolve>}
+
+    /**
  * @summary Consume a QR token and create a consent request
  */
-export const useResolvePatientQrToken = <
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof resolvePatientQrToken>>,
-    TError,
-    ResolvePatientQrTokenMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof resolvePatientQrToken>>,
-  TError,
-  ResolvePatientQrTokenMutationVariables,
-  TContext
-> => {
-  return useMutation(getResolvePatientQrTokenMutationOptions(options));
-};
+export const useResolvePatientQrToken = <TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolvePatientQrToken>>, TError,ResolvePatientQrTokenMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolvePatientQrToken>>,
+        TError,
+        ResolvePatientQrTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResolvePatientQrTokenMutationOptions(options));
+    }
 
-export const getGetClinicianAccessRequestUrl = (requestId: string) => {
-  return `/api/clinician/access-requests/${requestId}`;
-};
+export const getGetClinicianAccessRequestUrl = (requestId: string,) => {
+
+
+
+
+  return `/api/clinician/access-requests/${requestId}`
+}
 
 /**
  * @summary Get a request created by the clinician
  */
-export const getClinicianAccessRequest = async (
-  requestId: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(
-    getGetClinicianAccessRequestUrl(requestId),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
+export const getClinicianAccessRequest = async (requestId: string, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
 
-export const getGetClinicianAccessRequestQueryKey = (requestId: string) => {
-  return [`/api/clinician/access-requests/${requestId}`] as const;
-};
+  return customFetch<ApiSuccessResponse>(getGetClinicianAccessRequestUrl(requestId),
+  {
+    ...options,
+    method: 'GET'
 
-export const getGetClinicianAccessRequestQueryOptions = <
-  TData = Awaited<ReturnType<typeof getClinicianAccessRequest>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(
-  requestId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getClinicianAccessRequest>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
+
+  }
+);}
+
+
+
+
+
+export const getGetClinicianAccessRequestQueryKey = (requestId: string,) => {
+    return [
+    `/api/clinician/access-requests/${requestId}`
+    ] as const;
+    }
+
+
+export const getGetClinicianAccessRequestQueryOptions = <TData = Awaited<ReturnType<typeof getClinicianAccessRequest>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(requestId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClinicianAccessRequest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetClinicianAccessRequestQueryKey(requestId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getClinicianAccessRequest>>
-  > = ({ signal }) =>
-    getClinicianAccessRequest(requestId, { signal, ...requestOptions });
+  const queryKey =  queryOptions?.queryKey ?? getGetClinicianAccessRequestQueryKey(requestId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: requestId !== null && requestId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getClinicianAccessRequest>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
 
-export type GetClinicianAccessRequestQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getClinicianAccessRequest>>
->;
-export type GetClinicianAccessRequestQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClinicianAccessRequest>>> = ({ signal }) => getClinicianAccessRequest(requestId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: requestId !== null && requestId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClinicianAccessRequest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClinicianAccessRequestQueryResult = NonNullable<Awaited<ReturnType<typeof getClinicianAccessRequest>>>
+export type GetClinicianAccessRequestQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get a request created by the clinician
  */
 
-export function useGetClinicianAccessRequest<
-  TData = Awaited<ReturnType<typeof getClinicianAccessRequest>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(
-  requestId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getClinicianAccessRequest>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetClinicianAccessRequestQueryOptions(
-    requestId,
-    options,
-  );
+export function useGetClinicianAccessRequest<TData = Awaited<ReturnType<typeof getClinicianAccessRequest>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+ requestId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClinicianAccessRequest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClinicianAccessRequestQueryOptions(requestId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAuthorizedPatientUrl = () => {
-  return `/api/clinician/patients`;
-};
+
+
+
+
+  return `/api/clinician/patients`
+}
 
 /**
  * @summary Get a patient covered by an active grant
  */
-export const getAuthorizedPatient = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAuthorizedPatientUrl(), {
+export const getAuthorizedPatient = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAuthorizedPatientUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAuthorizedPatientQueryKey = () => {
-  return [`/api/clinician/patients`] as const;
-};
+    return [
+    `/api/clinician/patients`
+    ] as const;
+    }
 
-export const getGetAuthorizedPatientQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAuthorizedPatient>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthorizedPatient>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAuthorizedPatientQueryKey();
+export const getGetAuthorizedPatientQueryOptions = <TData = Awaited<ReturnType<typeof getAuthorizedPatient>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatient>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAuthorizedPatient>>
-  > = ({ signal }) => getAuthorizedPatient({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthorizedPatient>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthorizedPatientQueryKey();
 
-export type GetAuthorizedPatientQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAuthorizedPatient>>
->;
-export type GetAuthorizedPatientQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthorizedPatient>>> = ({ signal }) => getAuthorizedPatient({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatient>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuthorizedPatientQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthorizedPatient>>>
+export type GetAuthorizedPatientQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get a patient covered by an active grant
  */
 
-export function useGetAuthorizedPatient<
-  TData = Awaited<ReturnType<typeof getAuthorizedPatient>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthorizedPatient>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAuthorizedPatientQueryOptions(options);
+export function useGetAuthorizedPatient<TData = Awaited<ReturnType<typeof getAuthorizedPatient>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatient>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuthorizedPatientQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getGetAuthorizedPatientByIdUrl = (patientId: string) => {
-  return `/api/clinician/patients/${patientId}`;
-};
+
+
+
+
+
+
+export const getGetAuthorizedPatientByIdUrl = (patientId: string,) => {
+
+
+
+
+  return `/api/clinician/patients/${patientId}`
+}
 
 /**
  * @summary Get a specified patient covered by an active grant
  */
-export const getAuthorizedPatientById = async (
-  patientId: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(
-    getGetAuthorizedPatientByIdUrl(patientId),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
+export const getAuthorizedPatientById = async (patientId: string, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
 
-export const getGetAuthorizedPatientByIdQueryKey = (patientId: string) => {
-  return [`/api/clinician/patients/${patientId}`] as const;
-};
+  return customFetch<ApiSuccessResponse>(getGetAuthorizedPatientByIdUrl(patientId),
+  {
+    ...options,
+    method: 'GET'
 
-export const getGetAuthorizedPatientByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAuthorizedPatientById>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(
-  patientId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getAuthorizedPatientById>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
+
+  }
+);}
+
+
+
+
+
+export const getGetAuthorizedPatientByIdQueryKey = (patientId: string,) => {
+    return [
+    `/api/clinician/patients/${patientId}`
+    ] as const;
+    }
+
+
+export const getGetAuthorizedPatientByIdQueryOptions = <TData = Awaited<ReturnType<typeof getAuthorizedPatientById>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(patientId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatientById>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetAuthorizedPatientByIdQueryKey(patientId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAuthorizedPatientById>>
-  > = ({ signal }) =>
-    getAuthorizedPatientById(patientId, { signal, ...requestOptions });
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthorizedPatientByIdQueryKey(patientId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: patientId !== null && patientId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAuthorizedPatientById>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
 
-export type GetAuthorizedPatientByIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAuthorizedPatientById>>
->;
-export type GetAuthorizedPatientByIdQueryError = ErrorType<
-  UnauthenticatedResponse | ForbiddenResponse
->;
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthorizedPatientById>>> = ({ signal }) => getAuthorizedPatientById(patientId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: patientId !== null && patientId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatientById>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuthorizedPatientByIdQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthorizedPatientById>>>
+export type GetAuthorizedPatientByIdQueryError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>
+
 
 /**
  * @summary Get a specified patient covered by an active grant
  */
 
-export function useGetAuthorizedPatientById<
-  TData = Awaited<ReturnType<typeof getAuthorizedPatientById>>,
-  TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>,
->(
-  patientId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getAuthorizedPatientById>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAuthorizedPatientByIdQueryOptions(
-    patientId,
-    options,
-  );
+export function useGetAuthorizedPatientById<TData = Awaited<ReturnType<typeof getAuthorizedPatientById>>, TError = ErrorType<UnauthenticatedResponse | ForbiddenResponse>>(
+ patientId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthorizedPatientById>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuthorizedPatientByIdQueryOptions(patientId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getCreateEncounterUrl = () => {
-  return `/api/clinician/encounters`;
-};
+
+
+
+
+  return `/api/clinician/encounters`
+}
 
 /**
  * @summary Create an encounter within an active visits grant
  */
-export const createEncounter = async (
-  encounterInput: EncounterInput,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createEncounter = async (encounterInput: EncounterInput, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-  return customFetch<ApiSuccessResponse>(getCreateEncounterUrl(), {
+return customFetch<ApiSuccessResponse>(getCreateEncounterUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getHeaders(options?.headers),
-    },
-    body: JSON.stringify(encounterInput),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(encounterInput)
+  }
+);}
 
-export const getCreateEncounterMutationKey = () => ["createEncounter"] as const;
 
-export const getCreateEncounterMutationOptions = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createEncounter>>,
-    TError,
-    CreateEncounterMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createEncounter>>,
-  TError,
-  CreateEncounterMutationVariables,
-  TContext
-> => {
-  const mutationKey = getCreateEncounterMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createEncounter>>,
-    CreateEncounterMutationVariables
-  > = (props) => {
-    const { data } = props ?? {};
 
-    return createEncounter(data, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
+export const getCreateEncounterMutationKey = () => ['createEncounter'] as const;
 
-export type CreateEncounterMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createEncounter>>
->;
-export type CreateEncounterMutationBody = BodyType<EncounterInput>;
-export type CreateEncounterMutationError = ErrorType<ForbiddenResponse>;
-export type CreateEncounterMutationVariables = {
-  data: BodyType<EncounterInput>;
-};
+export const getCreateEncounterMutationOptions = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEncounter>>, TError,CreateEncounterMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEncounter>>, TError,CreateEncounterMutationVariables, TContext> => {
 
-/**
+const mutationKey = getCreateEncounterMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEncounter>>, CreateEncounterMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEncounter(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEncounterMutationResult = NonNullable<Awaited<ReturnType<typeof createEncounter>>>
+    export type CreateEncounterMutationBody = BodyType<EncounterInput>
+    export type CreateEncounterMutationError = ErrorType<ForbiddenResponse>
+    export type CreateEncounterMutationVariables = {data: BodyType<EncounterInput>}
+
+    /**
  * @summary Create an encounter within an active visits grant
  */
-export const useCreateEncounter = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createEncounter>>,
-    TError,
-    CreateEncounterMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createEncounter>>,
-  TError,
-  CreateEncounterMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreateEncounterMutationOptions(options));
-};
+export const useCreateEncounter = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEncounter>>, TError,CreateEncounterMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEncounter>>,
+        TError,
+        CreateEncounterMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateEncounterMutationOptions(options));
+    }
 
 export const getCreatePrescriptionUrl = () => {
-  return `/api/clinician/prescriptions`;
-};
+
+
+
+
+  return `/api/clinician/prescriptions`
+}
 
 /**
  * @summary Create a prescription within an active prescriptions grant
  */
-export const createPrescription = async (
-  prescriptionInput: PrescriptionInput,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createPrescription = async (prescriptionInput: PrescriptionInput, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-  return customFetch<ApiSuccessResponse>(getCreatePrescriptionUrl(), {
+return customFetch<ApiSuccessResponse>(getCreatePrescriptionUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getHeaders(options?.headers),
-    },
-    body: JSON.stringify(prescriptionInput),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(prescriptionInput)
+  }
+);}
 
-export const getCreatePrescriptionMutationKey = () =>
-  ["createPrescription"] as const;
 
-export const getCreatePrescriptionMutationOptions = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createPrescription>>,
-    TError,
-    CreatePrescriptionMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createPrescription>>,
-  TError,
-  CreatePrescriptionMutationVariables,
-  TContext
-> => {
-  const mutationKey = getCreatePrescriptionMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createPrescription>>,
-    CreatePrescriptionMutationVariables
-  > = (props) => {
-    const { data } = props ?? {};
 
-    return createPrescription(data, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
+export const getCreatePrescriptionMutationKey = () => ['createPrescription'] as const;
 
-export type CreatePrescriptionMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createPrescription>>
->;
-export type CreatePrescriptionMutationBody = BodyType<PrescriptionInput>;
-export type CreatePrescriptionMutationError = ErrorType<ForbiddenResponse>;
-export type CreatePrescriptionMutationVariables = {
-  data: BodyType<PrescriptionInput>;
-};
+export const getCreatePrescriptionMutationOptions = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPrescription>>, TError,CreatePrescriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPrescription>>, TError,CreatePrescriptionMutationVariables, TContext> => {
 
-/**
+const mutationKey = getCreatePrescriptionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPrescription>>, CreatePrescriptionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPrescription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePrescriptionMutationResult = NonNullable<Awaited<ReturnType<typeof createPrescription>>>
+    export type CreatePrescriptionMutationBody = BodyType<PrescriptionInput>
+    export type CreatePrescriptionMutationError = ErrorType<ForbiddenResponse>
+    export type CreatePrescriptionMutationVariables = {data: BodyType<PrescriptionInput>}
+
+    /**
  * @summary Create a prescription within an active prescriptions grant
  */
-export const useCreatePrescription = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createPrescription>>,
-    TError,
-    CreatePrescriptionMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createPrescription>>,
-  TError,
-  CreatePrescriptionMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreatePrescriptionMutationOptions(options));
-};
+export const useCreatePrescription = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPrescription>>, TError,CreatePrescriptionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPrescription>>,
+        TError,
+        CreatePrescriptionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePrescriptionMutationOptions(options));
+    }
 
 export const getCreateObservationUrl = () => {
-  return `/api/clinician/observations`;
-};
+
+
+
+
+  return `/api/clinician/observations`
+}
 
 /**
  * @summary Create an observation within an active labs grant
  */
-export const createObservation = async (
-  observationInput: ObservationInput,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createObservation = async (observationInput: ObservationInput, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
       if (value !== undefined) headers[name] = value;
     }
     return headers;
   };
-  return customFetch<ApiSuccessResponse>(getCreateObservationUrl(), {
+return customFetch<ApiSuccessResponse>(getCreateObservationUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getHeaders(options?.headers),
-    },
-    body: JSON.stringify(observationInput),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(observationInput)
+  }
+);}
 
-export const getCreateObservationMutationKey = () =>
-  ["createObservation"] as const;
 
-export const getCreateObservationMutationOptions = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createObservation>>,
-    TError,
-    CreateObservationMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createObservation>>,
-  TError,
-  CreateObservationMutationVariables,
-  TContext
-> => {
-  const mutationKey = getCreateObservationMutationKey();
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createObservation>>,
-    CreateObservationMutationVariables
-  > = (props) => {
-    const { data } = props ?? {};
 
-    return createObservation(data, requestOptions);
-  };
 
-  return { mutationFn, ...mutationOptions };
-};
+export const getCreateObservationMutationKey = () => ['createObservation'] as const;
 
-export type CreateObservationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createObservation>>
->;
-export type CreateObservationMutationBody = BodyType<ObservationInput>;
-export type CreateObservationMutationError = ErrorType<ForbiddenResponse>;
-export type CreateObservationMutationVariables = {
-  data: BodyType<ObservationInput>;
-};
+export const getCreateObservationMutationOptions = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createObservation>>, TError,CreateObservationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createObservation>>, TError,CreateObservationMutationVariables, TContext> => {
 
-/**
+const mutationKey = getCreateObservationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createObservation>>, CreateObservationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createObservation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateObservationMutationResult = NonNullable<Awaited<ReturnType<typeof createObservation>>>
+    export type CreateObservationMutationBody = BodyType<ObservationInput>
+    export type CreateObservationMutationError = ErrorType<ForbiddenResponse>
+    export type CreateObservationMutationVariables = {data: BodyType<ObservationInput>}
+
+    /**
  * @summary Create an observation within an active labs grant
  */
-export const useCreateObservation = <
-  TError = ErrorType<ForbiddenResponse>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createObservation>>,
-    TError,
-    CreateObservationMutationVariables,
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createObservation>>,
-  TError,
-  CreateObservationMutationVariables,
-  TContext
-> => {
-  return useMutation(getCreateObservationMutationOptions(options));
-};
+export const useCreateObservation = <TError = ErrorType<ForbiddenResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createObservation>>, TError,CreateObservationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createObservation>>,
+        TError,
+        CreateObservationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateObservationMutationOptions(options));
+    }
 
 export const getGetAdminSummaryUrl = () => {
-  return `/api/admin/summary`;
-};
+
+
+
+
+  return `/api/admin/summary`
+}
 
 /**
  * @summary Get K-suppressed aggregate system summary
  */
-export const getAdminSummary = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminSummaryUrl(), {
+export const getAdminSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminSummaryUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminSummaryQueryKey = () => {
-  return [`/api/admin/summary`] as const;
-};
+    return [
+    `/api/admin/summary`
+    ] as const;
+    }
 
-export const getGetAdminSummaryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminSummary>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSummary>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminSummaryQueryKey();
+export const getGetAdminSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSummary>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSummary>>> = ({
-    signal,
-  }) => getAdminSummary({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSummary>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSummaryQueryKey();
 
-export type GetAdminSummaryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminSummary>>
->;
-export type GetAdminSummaryQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSummary>>> = ({ signal }) => getAdminSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSummary>>>
+export type GetAdminSummaryQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get K-suppressed aggregate system summary
  */
 
-export function useGetAdminSummary<
-  TData = Awaited<ReturnType<typeof getAdminSummary>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSummary>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminSummaryQueryOptions(options);
+export function useGetAdminSummary<TData = Awaited<ReturnType<typeof getAdminSummary>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getGetAdminTrendsUrl = (params?: GetAdminTrendsParams) => {
+
+
+
+
+
+
+export const getGetAdminTrendsUrl = (params?: GetAdminTrendsParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0
-    ? `/api/admin/trends?${stringifiedParams}`
-    : `/api/admin/trends`;
-};
+  return stringifiedParams.length > 0 ? `/api/admin/trends?${stringifiedParams}` : `/api/admin/trends`
+}
 
 /**
  * @summary Query privacy-protected disease trends
  */
-export const getAdminTrends = async (
-  params?: GetAdminTrendsParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminTrendsUrl(params), {
+export const getAdminTrends = async (params?: GetAdminTrendsParams, options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminTrendsUrl(params),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
 
-export const getGetAdminTrendsQueryKey = (params?: GetAdminTrendsParams) => {
-  return [`/api/admin/trends`, ...(params ? [params] : [])] as const;
-};
 
-export const getGetAdminTrendsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminTrends>>,
-  TError = ErrorType<BadRequestResponse | ForbiddenResponse>,
->(
-  params?: GetAdminTrendsParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getAdminTrends>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
+  }
+);}
+
+
+
+
+
+export const getGetAdminTrendsQueryKey = (params?: GetAdminTrendsParams,) => {
+    return [
+    `/api/admin/trends`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminTrendsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminTrends>>, TError = ErrorType<BadRequestResponse | ForbiddenResponse>>(params?: GetAdminTrendsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminTrends>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminTrendsQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTrends>>> = ({
-    signal,
-  }) => getAdminTrends(params, { signal, ...requestOptions });
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminTrendsQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminTrends>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
 
-export type GetAdminTrendsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminTrends>>
->;
-export type GetAdminTrendsQueryError = ErrorType<
-  BadRequestResponse | ForbiddenResponse
->;
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTrends>>> = ({ signal }) => getAdminTrends(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminTrends>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminTrendsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminTrends>>>
+export type GetAdminTrendsQueryError = ErrorType<BadRequestResponse | ForbiddenResponse>
+
 
 /**
  * @summary Query privacy-protected disease trends
  */
 
-export function useGetAdminTrends<
-  TData = Awaited<ReturnType<typeof getAdminTrends>>,
-  TError = ErrorType<BadRequestResponse | ForbiddenResponse>,
->(
-  params?: GetAdminTrendsParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getAdminTrends>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminTrendsQueryOptions(params, options);
+export function useGetAdminTrends<TData = Awaited<ReturnType<typeof getAdminTrends>>, TError = ErrorType<BadRequestResponse | ForbiddenResponse>>(
+ params?: GetAdminTrendsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminTrends>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminTrendsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAdminRegionsUrl = () => {
-  return `/api/admin/regions`;
-};
+
+
+
+
+  return `/api/admin/regions`
+}
 
 /**
  * @summary Get privacy-protected regional aggregates
  */
-export const getAdminRegions = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminRegionsUrl(), {
+export const getAdminRegions = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminRegionsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminRegionsQueryKey = () => {
-  return [`/api/admin/regions`] as const;
-};
+    return [
+    `/api/admin/regions`
+    ] as const;
+    }
 
-export const getGetAdminRegionsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminRegions>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminRegions>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminRegionsQueryKey();
+export const getGetAdminRegionsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminRegions>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRegions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRegions>>> = ({
-    signal,
-  }) => getAdminRegions({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminRegions>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminRegionsQueryKey();
 
-export type GetAdminRegionsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminRegions>>
->;
-export type GetAdminRegionsQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRegions>>> = ({ signal }) => getAdminRegions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminRegions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminRegionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminRegions>>>
+export type GetAdminRegionsQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get privacy-protected regional aggregates
  */
 
-export function useGetAdminRegions<
-  TData = Awaited<ReturnType<typeof getAdminRegions>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminRegions>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminRegionsQueryOptions(options);
+export function useGetAdminRegions<TData = Awaited<ReturnType<typeof getAdminRegions>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminRegions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminRegionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAdminConditionsUrl = () => {
-  return `/api/admin/conditions`;
-};
+
+
+
+
+  return `/api/admin/conditions`
+}
 
 /**
  * @summary Get condition category aggregates
  */
-export const getAdminConditions = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminConditionsUrl(), {
+export const getAdminConditions = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminConditionsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminConditionsQueryKey = () => {
-  return [`/api/admin/conditions`] as const;
-};
+    return [
+    `/api/admin/conditions`
+    ] as const;
+    }
 
-export const getGetAdminConditionsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminConditions>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminConditions>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminConditionsQueryKey();
+export const getGetAdminConditionsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminConditions>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAdminConditions>>
-  > = ({ signal }) => getAdminConditions({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminConditions>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminConditionsQueryKey();
 
-export type GetAdminConditionsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminConditions>>
->;
-export type GetAdminConditionsQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminConditions>>> = ({ signal }) => getAdminConditions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminConditions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminConditionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminConditions>>>
+export type GetAdminConditionsQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get condition category aggregates
  */
 
-export function useGetAdminConditions<
-  TData = Awaited<ReturnType<typeof getAdminConditions>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminConditions>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminConditionsQueryOptions(options);
+export function useGetAdminConditions<TData = Awaited<ReturnType<typeof getAdminConditions>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminConditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminConditionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAdminPrivacyConfigUrl = () => {
-  return `/api/admin/privacy-config`;
-};
+
+
+
+
+  return `/api/admin/privacy-config`
+}
 
 /**
  * @summary Get privacy threshold and aggregate metrics
  */
-export const getAdminPrivacyConfig = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminPrivacyConfigUrl(), {
+export const getAdminPrivacyConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminPrivacyConfigUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminPrivacyConfigQueryKey = () => {
-  return [`/api/admin/privacy-config`] as const;
-};
+    return [
+    `/api/admin/privacy-config`
+    ] as const;
+    }
 
-export const getGetAdminPrivacyConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminPrivacyConfig>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminPrivacyConfig>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminPrivacyConfigQueryKey();
+export const getGetAdminPrivacyConfigQueryOptions = <TData = Awaited<ReturnType<typeof getAdminPrivacyConfig>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrivacyConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAdminPrivacyConfig>>
-  > = ({ signal }) => getAdminPrivacyConfig({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminPrivacyConfig>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminPrivacyConfigQueryKey();
 
-export type GetAdminPrivacyConfigQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminPrivacyConfig>>
->;
-export type GetAdminPrivacyConfigQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPrivacyConfig>>> = ({ signal }) => getAdminPrivacyConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminPrivacyConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminPrivacyConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminPrivacyConfig>>>
+export type GetAdminPrivacyConfigQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get privacy threshold and aggregate metrics
  */
 
-export function useGetAdminPrivacyConfig<
-  TData = Awaited<ReturnType<typeof getAdminPrivacyConfig>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminPrivacyConfig>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminPrivacyConfigQueryOptions(options);
+export function useGetAdminPrivacyConfig<TData = Awaited<ReturnType<typeof getAdminPrivacyConfig>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminPrivacyConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminPrivacyConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAdminAuditEventsUrl = () => {
-  return `/api/admin/audit`;
-};
+
+
+
+
+  return `/api/admin/audit`
+}
 
 /**
  * @summary Get paginated metadata-only audit events
  */
-export const getAdminAuditEvents = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminAuditEventsUrl(), {
+export const getAdminAuditEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminAuditEventsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminAuditEventsQueryKey = () => {
-  return [`/api/admin/audit`] as const;
-};
+    return [
+    `/api/admin/audit`
+    ] as const;
+    }
 
-export const getGetAdminAuditEventsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminAuditEvents>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminAuditEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminAuditEventsQueryKey();
+export const getGetAdminAuditEventsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminAuditEvents>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminAuditEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAdminAuditEvents>>
-  > = ({ signal }) => getAdminAuditEvents({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminAuditEvents>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminAuditEventsQueryKey();
 
-export type GetAdminAuditEventsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminAuditEvents>>
->;
-export type GetAdminAuditEventsQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAuditEvents>>> = ({ signal }) => getAdminAuditEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminAuditEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminAuditEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminAuditEvents>>>
+export type GetAdminAuditEventsQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get paginated metadata-only audit events
  */
 
-export function useGetAdminAuditEvents<
-  TData = Awaited<ReturnType<typeof getAdminAuditEvents>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminAuditEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminAuditEventsQueryOptions(options);
+export function useGetAdminAuditEvents<TData = Awaited<ReturnType<typeof getAdminAuditEvents>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminAuditEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminAuditEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetAdminSecurityEventsUrl = () => {
-  return `/api/admin/security-events`;
-};
+
+
+
+
+  return `/api/admin/security-events`
+}
 
 /**
  * @summary Get safe security event summaries
  */
-export const getAdminSecurityEvents = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<ApiSuccessResponse> => {
-  return customFetch<ApiSuccessResponse>(getGetAdminSecurityEventsUrl(), {
+export const getAdminSecurityEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<ApiSuccessResponse> => {
+
+  return customFetch<ApiSuccessResponse>(getGetAdminSecurityEventsUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
 
 export const getGetAdminSecurityEventsQueryKey = () => {
-  return [`/api/admin/security-events`] as const;
-};
+    return [
+    `/api/admin/security-events`
+    ] as const;
+    }
 
-export const getGetAdminSecurityEventsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminSecurityEvents>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSecurityEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetAdminSecurityEventsQueryKey();
+export const getGetAdminSecurityEventsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSecurityEvents>>, TError = ErrorType<ForbiddenResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAdminSecurityEvents>>
-  > = ({ signal }) => getAdminSecurityEvents({ signal, ...requestOptions });
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSecurityEvents>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSecurityEventsQueryKey();
 
-export type GetAdminSecurityEventsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminSecurityEvents>>
->;
-export type GetAdminSecurityEventsQueryError = ErrorType<ForbiddenResponse>;
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSecurityEvents>>> = ({ signal }) => getAdminSecurityEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSecurityEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminSecurityEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSecurityEvents>>>
+export type GetAdminSecurityEventsQueryError = ErrorType<ForbiddenResponse>
+
 
 /**
  * @summary Get safe security event summaries
  */
 
-export function useGetAdminSecurityEvents<
-  TData = Awaited<ReturnType<typeof getAdminSecurityEvents>>,
-  TError = ErrorType<ForbiddenResponse>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminSecurityEvents>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminSecurityEventsQueryOptions(options);
+export function useGetAdminSecurityEvents<TData = Awaited<ReturnType<typeof getAdminSecurityEvents>>, TError = ErrorType<ForbiddenResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminSecurityEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminSecurityEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+

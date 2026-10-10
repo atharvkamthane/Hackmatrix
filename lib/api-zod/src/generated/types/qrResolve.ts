@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QrResolveDurationMinutes } from './qrResolveDurationMinutes';
 import type { QrResolveScopesItem } from './qrResolveScopesItem';
 
 export interface QrResolve {
@@ -15,9 +16,5 @@ export interface QrResolve {
      * @maxItems 3
      */
   scopes?: QrResolveScopesItem[];
-  /**
-     * @minimum 5
-     * @maximum 240
-     */
-  durationMinutes?: number;
+  durationMinutes?: QrResolveDurationMinutes;
 }
