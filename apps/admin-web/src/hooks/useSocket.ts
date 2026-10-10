@@ -17,13 +17,13 @@ export interface AnalyticsUpdatePayload {
 }
 
 export function useSocket(onAnalyticsUpdate?: (payload: AnalyticsUpdatePayload) => void) {
-  const { isAuthenticated, getAuthHeader } = useAuth();
+  const { isAuthenticated, getToken } = useAuth();
   const [status, setStatus] = useState<SocketStatus>('offline');
   const [lastEvent, setLastEvent] = useState<AnalyticsUpdatePayload | null>(null);
   const [lastEventTime, setLastEventTime] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  const connectSocket = useCallback(() => {
+  const connectSocket = useCallback(async () => {
     if (!isAuthenticated) {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -35,11 +35,16 @@ export function useSocket(onAnalyticsUpdate?: (payload: AnalyticsUpdatePayload) 
 
     const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
-    if (socketRef.current?.connected) {
+    if (socketRef.current) {
       return;
     }
 
     setStatus('connecting');
+    const token = await getToken();
+    if (!token) {
+      setStatus('offline');
+      return;
+    }
 
     const socket = io(socketUrl, {
       path: '/socket.io',
@@ -47,7 +52,7 @@ export function useSocket(onAnalyticsUpdate?: (payload: AnalyticsUpdatePayload) 
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
-      auth: getAuthHeader(),
+      auth: { token },
     });
 
     socketRef.current = socket;
@@ -93,7 +98,7 @@ export function useSocket(onAnalyticsUpdate?: (payload: AnalyticsUpdatePayload) 
       }
     });
 
-  }, [isAuthenticated, getAuthHeader, onAnalyticsUpdate]);
+  }, [getToken, isAuthenticated, onAnalyticsUpdate]);
 
   useEffect(() => {
     connectSocket();

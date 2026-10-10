@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -51,6 +52,18 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  if (!clerkPublishableKey) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.configurationMessage}>
+          <Text style={styles.configurationText}>
+            Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to enable HackMatrix sign-in.
+          </Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   const content = (
     <AppProvider>
       <RootLayoutNav />
@@ -63,13 +76,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView>
             <KeyboardProvider>
-              {clerkPublishableKey ? (
-                <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-                  {content}
-                </ClerkProvider>
-              ) : (
-                content
-              )}
+              <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+                {content}
+              </ClerkProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
@@ -77,3 +86,8 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  configurationMessage: { flex: 1, justifyContent: 'center', padding: 24 },
+  configurationText: { fontFamily: 'Inter_500Medium', fontSize: 14, textAlign: 'center' },
+});

@@ -19,10 +19,11 @@ import {
 } from './mockDataService';
 
 export const isDemoMode = (): boolean => {
-  return import.meta.env.VITE_DEMO_MODE === 'true' || localStorage.getItem('hm_demo_mode') === 'true';
+  return import.meta.env.VITE_DEMO_MODE === 'true' && localStorage.getItem('hm_demo_mode') !== 'false';
 };
 
 export const setDemoMode = (enabled: boolean): void => {
+  if (import.meta.env.VITE_DEMO_MODE !== 'true') return;
   localStorage.setItem('hm_demo_mode', enabled ? 'true' : 'false');
 };
 
@@ -35,8 +36,8 @@ export const adminService = {
       const response = await apiClient.get<AdminSummaryDTO>('/admin/summary');
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/summary unreachable. Falling back to Demo Mode with DEMO DATA banner.', err);
-      return { ...MOCK_SUMMARY, kpi: { ...MOCK_SUMMARY.kpi, isDemoData: true } };
+      console.warn('Backend API /admin/summary request failed.', err);
+      throw err;
     }
   },
 
@@ -48,8 +49,8 @@ export const adminService = {
       const response = await apiClient.get<TrendsResponseDTO>('/admin/trends', { params: filters });
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/trends unreachable. Falling back to Demo Mode data.', err);
-      return MOCK_TRENDS(filters);
+      console.warn('Backend API /admin/trends request failed.', err);
+      throw err;
     }
   },
 
@@ -61,8 +62,8 @@ export const adminService = {
       const response = await apiClient.get<RegionsResponseDTO>('/admin/regions');
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/regions unreachable. Falling back to Demo Mode data.', err);
-      return MOCK_REGIONS;
+      console.warn('Backend API /admin/regions request failed.', err);
+      throw err;
     }
   },
 
@@ -120,8 +121,8 @@ export const adminService = {
       const response = await apiClient.get<ConditionCategoryDTO[]>('/admin/conditions');
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/conditions unreachable. Falling back to Demo Mode data.', err);
-      return adminService.getConditions();
+      console.warn('Backend API /admin/conditions request failed.', err);
+      throw err;
     }
   },
 
@@ -133,8 +134,8 @@ export const adminService = {
       const response = await apiClient.get<PrivacyConfigDTO>('/admin/privacy-config');
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/privacy-config unreachable. Falling back to Demo Mode data.', err);
-      return MOCK_PRIVACY_CONFIG;
+      console.warn('Backend API /admin/privacy-config request failed.', err);
+      throw err;
     }
   },
 
@@ -146,8 +147,8 @@ export const adminService = {
       const response = await apiClient.get<AuditResponseDTO>('/admin/audit', { params: { page, pageSize } });
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/audit unreachable. Falling back to Demo Mode data.', err);
-      return MOCK_AUDIT;
+      console.warn('Backend API /admin/audit request failed.', err);
+      throw err;
     }
   },
 
@@ -159,8 +160,8 @@ export const adminService = {
       const response = await apiClient.get<SecurityResponseDTO>('/admin/security-events');
       return response.data;
     } catch (err) {
-      console.warn('Backend API /admin/security-events unreachable. Falling back to Demo Mode data.', err);
-      return MOCK_SECURITY;
+      console.warn('Backend API /admin/security-events request failed.', err);
+      throw err;
     }
   },
 };

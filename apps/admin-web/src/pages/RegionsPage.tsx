@@ -101,7 +101,7 @@ export const RegionsPage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">{region.state}</h3>
-                    <p className="text-[11px] text-slate-500">{region.districts.length} Monitored Sentinel Districts • {region.coveragePercentage}% Sentinel Site Coverage</p>
+                    <p className="text-[11px] text-slate-500">{region.districts.length} Monitored Units • {region.coveragePercentage === null ? 'Coverage not reported' : `${region.coveragePercentage}% Sentinel Site Coverage`}</p>
                   </div>
                 </div>
 
@@ -132,7 +132,7 @@ export const RegionsPage: React.FC = () => {
                       {region.districts.map((dist, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3 px-4 font-semibold text-slate-800">{dist.district}</td>
-                          <td className="py-3 px-4 text-center font-mono text-slate-600">{dist.activeSurveillanceSites} Sites</td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-600">{dist.activeSurveillanceSites === null ? 'Not reported' : `${dist.activeSurveillanceSites} Sites`}</td>
                           <td className="py-3 px-4 text-right font-mono font-medium text-slate-900">
                             {formatAggregateValue(dist.cases)}
                           </td>

@@ -2,7 +2,7 @@
 
 HackMatrix is a consent-first healthcare records prototype. It demonstrates how a patient can control when a clinician receives access to selected health records, while keeping the user experience simple enough to explore on a phone or in a browser.
 
-The repository currently contains a working Expo mobile demonstration, a small API foundation, generated API packages, and a component-preview sandbox. The mobile demonstration intentionally uses synthetic data and device-local storage; it is not a production healthcare system and must not be used with real patient information.
+The repository contains an Expo doctor/patient application, a React administrator website, and a shared Express API. Explicit demo mode uses synthetic, device-local data. Production mode uses Clerk authentication and the shared API, which connects to MongoDB. This remains a prototype and is not a certified or production-ready healthcare system; do not use real patient information until the security, privacy, operational, and regulatory requirements have been independently reviewed.
 
 ## What the demo shows
 
@@ -37,14 +37,15 @@ This is a pnpm workspace:
 ```text
 .
 ├── artifacts/
-│   ├── hackmatrix-mobile/   # Expo Router mobile application
-│   ├── api-server/          # Express API host and health route
+│   ├── hackmatrix-mobile/   # Expo Router doctor/patient application
+│   ├── api-server/          # Shared Express API and MongoDB models
 │   └── mockup-sandbox/      # Vite component preview application
+├── apps/
+│   └── admin-web/           # React/Vite administrator website
 ├── lib/
 │   ├── api-spec/            # OpenAPI source specification
 │   ├── api-client-react/    # Generated React Query API client
 │   ├── api-zod/             # Generated Zod schemas and types
-│   └── db/                  # Drizzle database package foundation
 ├── scripts/                 # Workspace utility scripts
 ├── package.json             # Root workspace scripts
 ├── pnpm-workspace.yaml      # Workspace packages and dependency catalog
@@ -59,22 +60,21 @@ The mobile app lives in [`artifacts/hackmatrix-mobile`](./artifacts/hackmatrix-m
 - `app/(clinician)/` contains clinician tabs, scanning, waiting, patient, encounter, prescription, and observation screens.
 - `src/screens/` contains the login, patient, and clinician screen implementations.
 - `src/services/contracts.ts` defines replaceable authentication, patient, clinician, and realtime service interfaces.
-- `src/services/mock.ts` implements the current demo using AsyncStorage and synthetic seed data.
+- `src/services/mock.ts` implements explicit demo mode using AsyncStorage and synthetic seed data.
+- `src/services/remote.ts` calls the shared API in production mode using the active Clerk token.
 - `src/types/models.ts` contains shared domain types.
 - `src/context/AppContext.tsx` provides app-level session and access metadata.
 
-### API and shared packages
+### API, database, and administrator website
 
-The API foundation is intentionally small at this stage:
-
-- `artifacts/api-server` hosts an Express application under `/api`.
-- `GET /api/healthz` is the currently implemented endpoint.
-- `lib/api-spec/openapi.yaml` is the source OpenAPI document.
-- `lib/api-zod` contains generated validation schemas and API types.
-- `lib/api-client-react` contains the generated React Query client.
-- `lib/db` is the Drizzle package boundary for a future persistent implementation; it currently has no application tables.
-
-The mobile demo does **not** depend on the API server or database. Its local mock service is the source of truth for the current demo experience.
+- `artifacts/api-server` hosts the shared Express API on port `5000` by default.
+- MongoDB/Mongoose connections and clinical models live under `artifacts/api-server/src/db` and `src/models`.
+- The API resolves Clerk identities against MongoDB user/role mappings. Protected clinical and administrator routes enforce server-side role checks.
+- The administrator API reads only non-identifying monthly surveillance aggregates from the analytics collection and applies K=10 suppression.
+- The mobile service boundary selects AsyncStorage mocks only for explicit demo sessions; production requests use the same API.
+- `apps/admin-web` obtains a Clerk session token and calls the shared API. Configure it with `apps/admin-web/.env` or deployment environment variables.
+- PostgreSQL/Drizzle scaffolding has been removed from the active workspace. MongoDB is the application's database technology.
+- `lib/api-spec/openapi.yaml`, `lib/api-zod`, and `lib/api-client-react` remain shared API-contract packages; the current mobile service adapter calls the REST routes directly.
 
 ## Technology stack
 
@@ -83,12 +83,12 @@ The mobile demo does **not** depend on the API server or database. Its local moc
 - Expo SDK 57 and Expo Router
 - React Native 0.86
 - React 19
-- AsyncStorage for device-local demo state
-- Express 5, CORS, Pino, and Pino HTTP logging for the API foundation
+- AsyncStorage for explicit device-local demo state
+- Clerk for mobile and administrator identity; server-side roles are loaded from MongoDB
+- Express 5, Mongoose, MongoDB, CORS, rate limiting, Helmet, Pino, and Socket.IO
 - OpenAPI 3.1
 - Orval-generated API clients and Zod schemas
-- Drizzle ORM package boundary
-- Vite and React for the component-preview sandbox
+- Vite and React for the administrator website and component-preview sandbox
 
 ## Prerequisites
 
@@ -114,6 +114,8 @@ From the repository root:
 ```bash
 pnpm install
 ```
+
+Configure a root `.env` using `.env.example` for MongoDB and Clerk. Set `MONGODB_URI`, `CLERK_SECRET_KEY`, and `CLERK_PUBLISHABLE_KEY`; assign each Clerk user's `PATIENT`, `CLINICIAN`, or `ADMIN` role in the MongoDB `users` collection. Never commit `.env` or put server secrets in frontend environment files.
 
 The workspace uses a one-day minimum package release age in `pnpm-workspace.yaml` as a supply-chain protection. A dependency must normally have been published for at least 1,440 minutes before pnpm will install it.
 
@@ -159,28 +161,59 @@ pnpm --filter @workspace/hackmatrix-mobile run serve
 
 The mobile build script creates a web export. The `serve` script serves the generated output.
 
-### Run the API server
+The mobile app supports explicit local demo mode and Clerk-backed production mode. In production, set `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` and `EXPO_PUBLIC_API_BASE_URL` in the mobile environment. For a physical phone, use the development machine's LAN address instead of `localhost`.
 
-The API server requires a positive `PORT` environment variable:
+### Run the administrator website
+
+The admin app has its own package lock. Configure `apps/admin-web/.env` from `apps/admin-web/.env.example`, then run:
 
 ```bash
-# PowerShell
-$env:PORT = "3000"
+cd apps/admin-web
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+The Vite proxy sends `/api` and `/socket.io` to `http://localhost:5000` by default. For deployment, set `VITE_API_BASE_URL` to the shared API's `/api` URL and provide the Clerk publishable key. `VITE_DEMO_MODE` must only be enabled for an intentionally isolated demo build.
+
+### Run the API server
+
+Start MongoDB locally or configure MongoDB Atlas in the root `.env`. The API connects to MongoDB before it starts listening; `PORT` defaults to `5000`.
+
+```bash
 pnpm --filter @workspace/api-server run dev
 ```
 
-```bash
-# macOS/Linux
-PORT=3000 pnpm --filter @workspace/api-server run dev
-```
-
-Then check the health endpoint:
+Check liveness and dependency readiness:
 
 ```text
-http://localhost:3000/api/healthz
+http://localhost:5000/api/healthz
+http://localhost:5000/api/readyz
 ```
 
 The server builds to `artifacts/api-server/dist` before starting. The generated output is ignored by Git.
+
+### Shared API routes
+
+Protected routes require a Clerk bearer token. The server resolves the user's active MongoDB role mapping; frontend-supplied roles are not trusted.
+
+| Method | Route | Access |
+| --- | --- | --- |
+| GET | `/api/healthz`, `/api/readyz` | Public status |
+| GET | `/api/auth/me` | Authenticated profile, role, capabilities |
+| GET | `/api/access/overview` | Patient or clinician consent overview |
+| GET | `/api/patient/me`, `/api/patient/records` | Patient's own profile and records |
+| GET | `/api/patient/qr-token` | Patient; creates a short-lived opaque QR token |
+| GET | `/api/patient/access-requests`, `/api/patient/grants` | Patient's consent requests and grants |
+| POST | `/api/patient/access-requests/:requestId/decision` | Patient approve/deny |
+| POST | `/api/patient/grants/:grantId/revoke` | Patient revoke |
+| POST | `/api/clinician/qr/resolve` | Clinician; consumes a single-use QR token and requests consent |
+| GET | `/api/clinician/access-requests/:requestId` | Requesting clinician |
+| GET | `/api/clinician/patients`, `/api/clinician/patients/:patientId` | Clinician with an active grant |
+| POST | `/api/clinician/encounters`, `/api/clinician/prescriptions`, `/api/clinician/observations` | Clinician with matching active grant scope |
+| GET | `/api/admin/summary`, `/api/admin/trends`, `/api/admin/regions`, `/api/admin/conditions` | Admin; MongoDB aggregates only |
+| GET | `/api/admin/privacy-config`, `/api/admin/audit`, `/api/admin/security-events` | Admin |
+
+All administrator endpoints require the server-assigned `ADMIN` role. The mobile API enforces patient ownership, organization membership, consent expiry/revocation, and per-record scopes.
 
 ### Run the component-preview sandbox
 
@@ -215,31 +248,26 @@ The patient seed data includes synthetic records and a pending clinician request
 
 ## Data, privacy, and security boundaries
 
-This repository contains a demonstration implementation only:
+This repository remains a prototype, with explicit demo and production service paths:
 
-- All bundled records are synthetic.
-- Demo sign-in selects a local role; it is not authentication.
-- AsyncStorage is device-local. A second device will not see the first device's requests, grants, QR tokens, or records.
-- QR payloads contain opaque, temporary tokens rather than patient identifiers or clinical details.
-- The mobile app enforces role and scope checks in its mock service, but a production server must enforce them independently.
-- The API server currently exposes only a health check and is not connected to the mobile demo.
-- No production identity provider, audit-grade storage, encryption/key management, clinical interoperability, or regulatory compliance layer is implemented.
+- Demo records and demo sign-in are synthetic and device-local; they are not shared across devices.
+- Production Clerk identities must have an active MongoDB user/role mapping and patient/clinician profile before clinical routes work.
+- QR tokens are random, short-lived, single-use, hashed in MongoDB, and contain no patient record data.
+- General administrator analytics read only the aggregate collection and suppress a result when any contributing cell is below K=10.
+- No emergency-access endpoint/workflow or analytics ingestion pipeline is implemented yet. The analytics dashboard returns empty states until trusted aggregate documents are loaded.
+- Real MongoDB/Clerk credentials and provider dashboard settings are required to exercise production flows; automated tests use isolated in-memory model validation and request fakes, not a live MongoDB instance.
+- This repository does not provide a compliance certification, key-management service, backup/retention policy, or clinical interoperability implementation.
 
 Do not enter real patient data, credentials, access tokens, or other sensitive information into the demo.
 
-## Design and extension notes
+## Remaining work
 
-The service boundary is deliberately replaceable. To connect a real backend:
-
-1. Keep the interfaces in `artifacts/hackmatrix-mobile/src/services/contracts.ts` as the client contract.
-2. Add a network-backed implementation alongside `src/services/mock.ts`.
-3. Select the implementation from `src/services/index.ts`.
-4. Move authorization, scope enforcement, expiry checks, and audit logging to the server.
-5. Replace the local AsyncStorage state with durable, access-controlled persistence.
-6. Expand `lib/api-spec/openapi.yaml`, then regenerate the API client and Zod packages.
-7. Add integration and end-to-end tests for denial, expiry, revocation, and scope boundaries.
-
-Keep the current mock implementation available for deterministic demos and UI development.
+- Provision a MongoDB test database and Clerk development application; create active user, organization, patient, and clinician mappings for end-to-end testing.
+- Add trusted aggregate-data ingestion and source validation; do not populate production analytics with sample counts.
+- Complete multi-factor/one-time-code sign-in handling for Clerk configurations that require it.
+- Implement the explicitly required emergency-access workflow with reason, duration, patient notification, and immutable audit semantics.
+- Add live MongoDB integration tests for database failures, consent expiry/revocation, QR replay prevention, role denial, and cross-app consistency.
+- Keep `lib/api-spec/openapi.yaml` and generated packages aligned with the implemented route contract.
 
 ## Troubleshooting
 

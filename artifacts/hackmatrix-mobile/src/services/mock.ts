@@ -425,8 +425,9 @@ export const mockServices: HackMatrixServices = {
         observations: grant.scopes.includes('Observations') ? state.observations : [],
       };
     },
-    async createEncounter(input: Pick<Encounter, 'diagnosis' | 'reason' | 'date'>) {
+    async createEncounter(input: Pick<Encounter, 'diagnosis' | 'reason' | 'date'> & { patientId: string }) {
       await requireRole('clinician');
+      if (input.patientId !== DEMO_PATIENT_ID) throw new Error('The demo grant does not cover this patient.');
       const state = await readState();
       requireScope(state, 'Encounters');
       const encounter: Encounter = {
@@ -441,8 +442,9 @@ export const mockServices: HackMatrixServices = {
       }));
       return encounter;
     },
-    async createPrescription(input: Pick<Prescription, 'drug' | 'dose' | 'frequency' | 'start' | 'end'>) {
+    async createPrescription(input: Pick<Prescription, 'drug' | 'dose' | 'frequency' | 'start' | 'end'> & { patientId: string }) {
       await requireRole('clinician');
+      if (input.patientId !== DEMO_PATIENT_ID) throw new Error('The demo grant does not cover this patient.');
       const state = await readState();
       requireScope(state, 'Prescriptions');
       const prescription: Prescription = {
@@ -456,8 +458,9 @@ export const mockServices: HackMatrixServices = {
       }));
       return prescription;
     },
-    async createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'>) {
+    async createObservation(input: Pick<Observation, 'title' | 'value' | 'unit' | 'date'> & { patientId: string }) {
       await requireRole('clinician');
+      if (input.patientId !== DEMO_PATIENT_ID) throw new Error('The demo grant does not cover this patient.');
       const state = await readState();
       requireScope(state, 'Observations');
       const observation: Observation = {

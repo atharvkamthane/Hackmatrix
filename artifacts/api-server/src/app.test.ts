@@ -156,6 +156,52 @@ test("admin cannot access patient endpoint", async () => {
   assert.equal(response.status, 403);
 });
 
+test("unauthenticated requests cannot access admin analytics", async () => {
+  const response = await request(authApp(null), "/api/admin/summary");
+  assert.equal(response.status, 401);
+  assert.equal(JSON.parse(response.body).error.code, "UNAUTHENTICATED");
+});
+
+test("clinicians cannot access admin analytics", async () => {
+  const response = await request(
+    authApp({ userId: "user_clinician", roleClaim: "CLINICIAN", organizationId: "org_1" }),
+    "/api/admin/summary",
+  );
+  assert.equal(response.status, 403);
+});
+
+test("authorized admin gets an unavailable response when MongoDB is not configured", async () => {
+  const response = await request(
+    authApp({ userId: "user_admin", roleClaim: "ADMIN", organizationId: "org_1" }),
+    "/api/admin/summary",
+  );
+  assert.equal(response.status, 503);
+  assert.equal(JSON.parse(response.body).error.code, "DATABASE_UNAVAILABLE");
+});
+
+test("unauthenticated users cannot read patient records", async () => {
+  const response = await request(authApp(null), "/api/patient/records");
+  assert.equal(response.status, 401);
+  assert.equal(JSON.parse(response.body).error.code, "UNAUTHENTICATED");
+});
+
+test("clinicians cannot use patient-owned routes", async () => {
+  const response = await request(
+    authApp({ userId: "user_clinician", roleClaim: "CLINICIAN", organizationId: "org_1" }),
+    "/api/patient/me",
+  );
+  assert.equal(response.status, 403);
+});
+
+test("authenticated patient gets an unavailable response when MongoDB is not configured", async () => {
+  const response = await request(
+    authApp({ userId: "user_patient", roleClaim: "PATIENT", organizationId: "org_1" }),
+    "/api/patient/me",
+  );
+  assert.equal(response.status, 503);
+  assert.equal(JSON.parse(response.body).error.code, "DATABASE_UNAVAILABLE");
+});
+
 test("client supplied role cannot elevate verified identity", async () => {
   const response = await request(
     authApp({ userId: "user_patient", roleClaim: "PATIENT", organizationId: "org_1" }),
@@ -195,6 +241,7 @@ test("verified identity maps to internal user record with server-controlled role
   assert.equal(body.userId, "clerk_123");
   assert.equal(body.role, "PATIENT");
   assert.equal(body.organizationId, "org_internal_1");
+  assert.deepEqual(body.capabilities, ["clinical:read:self", "consent:manage:self", "qr:create:self"]);
 });
 
 test("unassigned identity without internal user mapping returns 403 USER_NOT_PROVISIONED", async () => {
@@ -257,5 +304,13 @@ test("Swagger UI documentation renders at GET /docs and spec at /docs/openapi.js
   assert.ok(parsed.paths["/healthz"]);
   assert.ok(parsed.paths["/readyz"]);
   assert.ok(parsed.paths["/auth/me"]);
+  assert.ok(parsed.paths["/patient/records"]);
+  assert.ok(parsed.paths["/clinician/qr/resolve"]);
+  assert.ok(parsed.paths["/admin/summary"]);
+});
+
+test("clinical constants enforce permitted durations [15, 30, 60] minutes", async () => {
+  const { PERMITTED_DURATIONS } = await import("./routes/clinical");
+  assert.deepEqual([...PERMITTED_DURATIONS], [15, 30, 60]);
 });
 
