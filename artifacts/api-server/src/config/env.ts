@@ -54,7 +54,7 @@ export type AppConfig = Omit<z.infer<typeof environmentSchema>, "CORS_ORIGINS"> 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = environmentSchema.parse(env);
   const corsOriginsValue =
-    parsed.CORS_ORIGINS ?? "http://localhost:3000,http://localhost:8081,http://localhost:19006";
+    parsed.CORS_ORIGINS ?? "http://localhost:3000,http://localhost:5173,http://localhost:8081,http://localhost:19006";
   const clerkAuthorizedParties = (parsed.CLERK_AUTHORIZED_PARTIES ?? "")
     .split(",")
     .map((party) => party.trim())

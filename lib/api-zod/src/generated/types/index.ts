@@ -22,6 +22,7 @@ export * from './healthStatus';
 export * from './observationInput';
 export * from './prescriptionInput';
 export * from './qrResolve';
+export * from './qrResolveDurationMinutes';
 export * from './qrResolveScopesItem';
 export * from './readinessStatus';
 export * from './readinessStatusStatus';

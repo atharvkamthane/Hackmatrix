@@ -9,28 +9,27 @@ export interface HealthStatus {
   status: string;
 }
 
-export type ReadinessStatusStatus =
-  (typeof ReadinessStatusStatus)[keyof typeof ReadinessStatusStatus];
+export type ReadinessStatusStatus = typeof ReadinessStatusStatus[keyof typeof ReadinessStatusStatus];
+
 
 export const ReadinessStatusStatus = {
-  ready: "ready",
-  not_ready: "not_ready",
+  ready: 'ready',
+  not_ready: 'not_ready',
 } as const;
 
 export interface ReadinessStatus {
   status: ReadinessStatusStatus;
 }
 
-export type ApiPayload =
-  { [key: string]: unknown } | { [key: string]: unknown }[];
+export type ApiPayload = { [key: string]: unknown } | { [key: string]: unknown }[];
 
-export type AuthMeResponseRole =
-  (typeof AuthMeResponseRole)[keyof typeof AuthMeResponseRole];
+export type AuthMeResponseRole = typeof AuthMeResponseRole[keyof typeof AuthMeResponseRole];
+
 
 export const AuthMeResponseRole = {
-  PATIENT: "PATIENT",
-  CLINICIAN: "CLINICIAN",
-  ADMIN: "ADMIN",
+  PATIENT: 'PATIENT',
+  CLINICIAN: 'CLINICIAN',
+  ADMIN: 'ADMIN',
 } as const;
 
 export interface AuthMeResponse {
@@ -41,40 +40,45 @@ export interface AuthMeResponse {
   capabilities: string[];
 }
 
-export type AccessDecisionDecision =
-  (typeof AccessDecisionDecision)[keyof typeof AccessDecisionDecision];
+export type AccessDecisionDecision = typeof AccessDecisionDecision[keyof typeof AccessDecisionDecision];
+
 
 export const AccessDecisionDecision = {
-  approved: "approved",
-  denied: "denied",
+  approved: 'approved',
+  denied: 'denied',
 } as const;
 
 export interface AccessDecision {
   decision: AccessDecisionDecision;
 }
 
-export type QrResolveScopesItem =
-  (typeof QrResolveScopesItem)[keyof typeof QrResolveScopesItem];
+export type QrResolveScopesItem = typeof QrResolveScopesItem[keyof typeof QrResolveScopesItem];
+
 
 export const QrResolveScopesItem = {
-  visits: "visits",
-  prescriptions: "prescriptions",
-  labs: "labs",
+  visits: 'visits',
+  prescriptions: 'prescriptions',
+  labs: 'labs',
+} as const;
+
+export type QrResolveDurationMinutes = typeof QrResolveDurationMinutes[keyof typeof QrResolveDurationMinutes];
+
+
+export const QrResolveDurationMinutes = {
+  NUMBER_15: 15,
+  NUMBER_30: 30,
+  NUMBER_60: 60,
 } as const;
 
 export interface QrResolve {
   /** @maxLength 128 */
   token: string;
   /**
-   * @minItems 1
-   * @maxItems 3
-   */
+     * @minItems 1
+     * @maxItems 3
+     */
   scopes?: QrResolveScopesItem[];
-  /**
-   * @minimum 5
-   * @maximum 240
-   */
-  durationMinutes?: number;
+  durationMinutes?: QrResolveDurationMinutes;
 }
 
 export interface EncounterInput {
@@ -143,13 +147,14 @@ export type ForbiddenResponse = ErrorResponse;
 export type BadRequestResponse = ErrorResponse;
 
 export type GetAdminTrendsParams = {
-  condition?: string;
-  /**
-   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
-   */
-  startMonth?: string;
-  /**
-   * @pattern ^\d{4}-(0[1-9]|1[0-2])$
-   */
-  endMonth?: string;
+condition?: string;
+/**
+ * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+ */
+startMonth?: string;
+/**
+ * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+ */
+endMonth?: string;
 };
+

@@ -309,3 +309,8 @@ test("Swagger UI documentation renders at GET /docs and spec at /docs/openapi.js
   assert.ok(parsed.paths["/admin/summary"]);
 });
 
+test("clinical constants enforce permitted durations [15, 30, 60] minutes", async () => {
+  const { PERMITTED_DURATIONS } = await import("./routes/clinical");
+  assert.deepEqual([...PERMITTED_DURATIONS], [15, 30, 60]);
+});
+
