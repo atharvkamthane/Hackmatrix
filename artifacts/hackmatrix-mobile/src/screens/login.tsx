@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useClerk } from '@clerk/expo';
+import { useClerk, useSignIn, useSignUp } from '@clerk/expo';
+import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { Button, Card, Field, InfoBanner, RoleLabel } from '@/src/components/ui';
 import { useAppContext } from '@/src/context/AppContext';
 import { useColors } from '@/hooks/useColors';
@@ -58,10 +59,21 @@ const PRESET_PERSONAS: Persona[] = [
 ];
 
 function extractClerkErrorMessage(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'errors' in err) {
-    const clerkErr = err as { errors?: Array<{ message?: string; longMessage?: string }> };
-    if (clerkErr.errors?.[0]) {
-      return clerkErr.errors[0].longMessage || clerkErr.errors[0].message || 'Sign-in failed.';
+  if (typeof err === 'string' && err.trim()) {
+    return err;
+  }
+  if (typeof err === 'object' && err !== null) {
+    if ('longMessage' in err && typeof (err as any).longMessage === 'string' && (err as any).longMessage) {
+      return (err as any).longMessage;
+    }
+    if ('errors' in err && Array.isArray((err as any).errors)) {
+      const firstErr = (err as any).errors[0];
+      if (firstErr) {
+        return firstErr.longMessage || firstErr.message || 'Authentication request failed.';
+      }
+    }
+    if ('message' in err && typeof (err as any).message === 'string' && (err as any).message) {
+      return (err as any).message;
     }
   }
   return err instanceof Error ? err.message : 'Invalid credentials or Clerk authentication failed.';
@@ -72,10 +84,14 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const clerk = useClerk();
-  const { isReady, role, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
+  const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
+  const { startHostedAuth } = useHostedAuth();
+  const [hostedLoading, setHostedLoading] = useState(false);
+  const { isReady, role, isUnprovisioned, provisionSelf, signInDemo, signInProduction, signOut, error, clearError } = useAppContext();
 
-  // Top Tabs: Demo vs Clerk
-  const [mainTab, setMainTab] = useState<MainTab>('demo');
+  // Top Tabs: Clerk Production vs Demo Sandbox
+  const [mainTab, setMainTab] = useState<MainTab>('clerk');
 
   // Tab 1 (Demo) State
   const [demoMode, setDemoMode] = useState<DemoMode>('personas');
@@ -93,6 +109,12 @@ export function LoginScreen() {
   const [clerkPassword, setClerkPassword] = useState('');
   const [clerkError, setClerkError] = useState<string | null>(null);
   const [clerkNotice, setClerkNotice] = useState<string | null>(null);
+
+  // Clerk Provisioning State
+  const [provisionRole, setProvisionRole] = useState<'PATIENT' | 'CLINICIAN'>('PATIENT');
+  const [provisionName, setProvisionName] = useState('');
+  const [provisionDetail, setProvisionDetail] = useState('');
+  const [provisionLoading, setProvisionLoading] = useState(false);
 
   // Clerk Sign In 2FA / Device Trust
   const [needsVerification, setNeedsVerification] = useState(false);
@@ -116,6 +138,13 @@ export function LoginScreen() {
     clerk.user?.primaryEmailAddress?.emailAddress ??
     clerk.session?.user?.primaryEmailAddress?.emailAddress ??
     (clerk.session ? 'Active session' : null);
+
+  useEffect(() => {
+    if (clerk.user && !provisionName) {
+      const name = `${clerk.user.firstName || ''} ${clerk.user.lastName || ''}`.trim();
+      if (name) setProvisionName(name);
+    }
+  }, [clerk.user, provisionName]);
 
   useEffect(() => {
     if (!isReady || !role) return;
@@ -189,6 +218,25 @@ export function LoginScreen() {
     }
   };
 
+  // Clerk: Self-provision for testing
+  const handleSelfProvision = async () => {
+    clearError();
+    setClerkError(null);
+    setClerkNotice(null);
+    if (!provisionName.trim()) {
+      setClerkError('Please enter your full name to complete provisioning.');
+      return;
+    }
+    setProvisionLoading(true);
+    try {
+      await provisionSelf(provisionRole, provisionName.trim(), provisionDetail.trim() || undefined);
+    } catch (err: unknown) {
+      setClerkError(extractClerkErrorMessage(err));
+    } finally {
+      setProvisionLoading(false);
+    }
+  };
+
   // Clerk: Sign out active session
   const handleClerkSignOut = async () => {
     clearError();
@@ -207,6 +255,34 @@ export function LoginScreen() {
     }
   };
 
+  const handleHostedAuth = async (mode: 'sign-in' | 'sign-up') => {
+    clearError();
+    setClerkError(null);
+    setClerkNotice(null);
+    setHostedLoading(true);
+    try {
+      const res = await startHostedAuth({ mode });
+      if (res?.createdSessionId) {
+        if (clerk.setActive) {
+          await clerk.setActive({ session: res.createdSessionId });
+        }
+        await signInProduction();
+      }
+    } catch (err: unknown) {
+      setClerkError(extractClerkErrorMessage(err));
+    } finally {
+      setHostedLoading(false);
+    }
+  };
+
+  const getActiveSignUp = () => {
+    return (signUp as any) || (clerk as any)?.client?.signUp || (clerk as any)?.signUp;
+  };
+
+  const getActiveSignIn = () => {
+    return (signIn as any) || (clerk as any)?.client?.signIn || (clerk as any)?.signIn;
+  };
+
   // Clerk: Sign In
   const handleClerkSignIn = async () => {
     clearError();
@@ -219,42 +295,88 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setClerkLoading(true);
     try {
       let result: any;
       try {
-        result = await clerk.client.signIn.create({
-          identifier: clerkEmail.trim(),
-          password: clerkPassword,
-        });
+        result = await Promise.race([
+          activeSignIn.create({
+            identifier: clerkEmail.trim(),
+            password: clerkPassword,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    'Sign in request timed out. If Native API is not enabled in your Clerk Dashboard, please use the Clerk Web Portal button above.'
+                  )
+                ),
+              12000
+            )
+          ),
+        ]);
       } catch (firstErr: unknown) {
         const msg = extractClerkErrorMessage(firstErr);
         if (msg.toLowerCase().includes('already signed in') || msg.toLowerCase().includes('session')) {
           if (clerk.signOut) {
-            await clerk.signOut();
+            try {
+              await Promise.race([
+                clerk.signOut(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+              ]);
+            } catch {
+              // ignore
+            }
           }
-          result = await clerk.client.signIn.create({
-            identifier: clerkEmail.trim(),
-            password: clerkPassword,
-          });
+          const retrySignIn = getActiveSignIn();
+          if (!retrySignIn) {
+            throw firstErr;
+          }
+          result = await Promise.race([
+            retrySignIn.create({
+              identifier: clerkEmail.trim(),
+              password: clerkPassword,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      'Sign in request timed out. If Native API is not enabled in your Clerk Dashboard, please use the Clerk Web Portal button above.'
+                    )
+                  ),
+                12000
+              )
+            ),
+          ]);
         } else {
           throw firstErr;
         }
       }
 
-      if (result.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: result.createdSessionId });
+      const status = result?.status || activeSignIn?.status;
+      const createdSessionId = result?.createdSessionId || activeSignIn?.createdSessionId;
+
+      if (status === 'complete') {
+        if (createdSessionId && clerk.setActive) {
+          await clerk.setActive({ session: createdSessionId });
         }
         await signInProduction();
-      } else if (result.status === 'needs_client_trust' || result.status === 'needs_second_factor') {
-        const secondFactors = result.supportedSecondFactors || [];
+      } else if (status === 'needs_client_trust' || status === 'needs_second_factor') {
+        const secondFactors = result?.supportedSecondFactors || activeSignIn?.supportedSecondFactors || [];
         const emailFactor = secondFactors.find((f: any) => f.strategy === 'email_code');
         const target = emailFactor?.safeIdentifier || clerkEmail.trim();
         setVerificationTarget(target);
         setNeedsVerification(true);
       } else {
-        setClerkError(`Additional verification required: ${result.status}`);
+        setClerkError(`Additional verification required: ${status || 'unknown'}`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -275,17 +397,27 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and retry.');
+      return;
+    }
+
     setVerificationLoading(true);
     try {
       let completeResult: any;
       try {
-        completeResult = await clerk.client.signIn.attemptSecondFactor({
-          strategy: 'email_code',
-          code: verificationCode.trim(),
-        });
+        if (typeof activeSignIn.attemptSecondFactor === 'function') {
+          completeResult = await activeSignIn.attemptSecondFactor({
+            strategy: 'email_code',
+            code: verificationCode.trim(),
+          });
+        } else {
+          throw new Error('Second factor verification method not available.');
+        }
       } catch (secondFactorErr: any) {
-        if (typeof clerk.client.signIn.attemptFirstFactor === 'function') {
-          completeResult = await clerk.client.signIn.attemptFirstFactor({
+        if (typeof activeSignIn.attemptFirstFactor === 'function') {
+          completeResult = await activeSignIn.attemptFirstFactor({
             strategy: 'email_code',
             code: verificationCode.trim(),
           });
@@ -294,13 +426,16 @@ export function LoginScreen() {
         }
       }
 
-      if (completeResult?.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: completeResult.createdSessionId });
+      const status = completeResult?.status || activeSignIn?.status;
+      const createdSessionId = completeResult?.createdSessionId || activeSignIn?.createdSessionId;
+
+      if (status === 'complete') {
+        if (createdSessionId && clerk.setActive) {
+          await clerk.setActive({ session: createdSessionId });
         }
         await signInProduction();
       } else {
-        setClerkError(`Verification incomplete (${completeResult?.status || 'unknown'}). Please check code.`);
+        setClerkError(`Verification incomplete (${status || 'unknown'}). Please check code.`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -313,14 +448,21 @@ export function LoginScreen() {
   const handleResendCode = async () => {
     clearError();
     setClerkError(null);
+
+    const activeSignIn = getActiveSignIn();
+    if (!activeSignIn) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and retry.');
+      return;
+    }
+
     setVerificationLoading(true);
     try {
-      if (typeof clerk.client.signIn.prepareSecondFactor === 'function') {
-        await clerk.client.signIn.prepareSecondFactor({ strategy: 'email_code' });
-      } else if (typeof clerk.client.signIn.prepareFirstFactor === 'function') {
-        const factors = (clerk.client.signIn as any).supportedFirstFactors;
+      if (typeof activeSignIn.prepareSecondFactor === 'function') {
+        await activeSignIn.prepareSecondFactor({ strategy: 'email_code' });
+      } else if (typeof activeSignIn.prepareFirstFactor === 'function') {
+        const factors = (activeSignIn as any).supportedFirstFactors;
         const emailFactor = factors?.find((f: any) => f.strategy === 'email_code');
-        await (clerk.client.signIn as any).prepareFirstFactor({
+        await (activeSignIn as any).prepareFirstFactor({
           strategy: 'email_code',
           ...(emailFactor?.emailAddressId ? { emailAddressId: emailFactor.emailAddressId } : {}),
         });
@@ -349,29 +491,60 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignUp = getActiveSignUp();
+    if (!activeSignUp) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setSignUpLoading(true);
     try {
       if (clerk.session || clerk.user) {
         try {
-          await clerk.signOut();
+          await Promise.race([
+            clerk.signOut(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+          ]);
         } catch {
           // ignore
         }
       }
 
-      const signUp = await clerk.client.signUp.create({
-        emailAddress: signUpEmail.trim(),
-        password: signUpPassword,
-        firstName: signUpFirstName.trim() || undefined,
-        lastName: signUpLastName.trim() || undefined,
-        unsafeMetadata: {
-          requestedRole: signUpRole.toUpperCase(),
-        },
-      });
+      const result = await Promise.race([
+        activeSignUp.create({
+          emailAddress: signUpEmail.trim(),
+          password: signUpPassword,
+          firstName: signUpFirstName.trim() || undefined,
+          lastName: signUpLastName.trim() || undefined,
+          unsafeMetadata: {
+            requestedRole: signUpRole.toUpperCase(),
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Registration request timed out. If Native API is not enabled in your Clerk Dashboard, please tap "Sign Up via Clerk Web Portal" above.'
+                )
+              ),
+            12000
+          )
+        ),
+      ]);
 
-      if (signUp.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: signUp.createdSessionId });
+      if (result?.error) {
+        setClerkError(extractClerkErrorMessage(result.error));
+        return;
+      }
+
+      const currentStatus = result?.status || activeSignUp?.status;
+      const currentSessionId = result?.createdSessionId || activeSignUp?.createdSessionId;
+      const unverified = result?.unverifiedFields || activeSignUp?.unverifiedFields;
+
+      if (currentStatus === 'complete') {
+        if (currentSessionId && clerk.setActive) {
+          await clerk.setActive({ session: currentSessionId });
         }
         try {
           await signInProduction();
@@ -380,13 +553,17 @@ export function LoginScreen() {
             'Account Created: Your Clerk account is verified. HackMatrix production access requires server-side administrative provisioning before clinical access is granted.'
           );
         }
-      } else if (signUp.status === 'missing_requirements' || (signUp as any).unverifiedFields?.includes('email_address')) {
-        await clerk.client.signUp.prepareEmailAddressVerification({
-          strategy: 'email_code',
-        });
+      } else if (currentStatus === 'missing_requirements' || unverified?.includes('email_address') || !currentStatus || currentStatus === 'unverified') {
+        if (typeof activeSignUp.prepareEmailAddressVerification === 'function') {
+          await activeSignUp.prepareEmailAddressVerification({
+            strategy: 'email_code',
+          });
+        } else if (activeSignUp.verifications?.sendEmailCode) {
+          await activeSignUp.verifications.sendEmailCode();
+        }
         setSignUpNeedsVerification(true);
       } else {
-        setClerkNotice(`Registration status: ${signUp.status}. Proceeding...`);
+        setClerkNotice(`Registration status: ${currentStatus}. Proceeding...`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -404,15 +581,46 @@ export function LoginScreen() {
       return;
     }
 
+    const activeSignUp = getActiveSignUp();
+    if (!activeSignUp) {
+      setClerkError('Clerk authentication service is still initializing. Please wait a moment and try again.');
+      return;
+    }
+
     setSignUpCodeLoading(true);
     try {
-      const completeSignUp = await clerk.client.signUp.attemptEmailAddressVerification({
-        code: signUpCode.trim(),
-      });
+      let completeSignUp: any;
+      if (typeof activeSignUp.attemptEmailAddressVerification === 'function') {
+        completeSignUp = await Promise.race([
+          activeSignUp.attemptEmailAddressVerification({
+            code: signUpCode.trim(),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Code verification request timed out.')), 12000)
+          ),
+        ]);
+      } else if (activeSignUp.verifications?.verifyEmailCode) {
+        completeSignUp = await Promise.race([
+          activeSignUp.verifications.verifyEmailCode({
+            code: signUpCode.trim(),
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Code verification request timed out.')), 12000)
+          ),
+        ]);
+      }
 
-      if (completeSignUp.status === 'complete') {
-        if (clerk.setActive) {
-          await clerk.setActive({ session: completeSignUp.createdSessionId });
+      if (completeSignUp?.error) {
+        setClerkError(extractClerkErrorMessage(completeSignUp.error));
+        return;
+      }
+
+      const currentStatus = completeSignUp?.status || activeSignUp?.status;
+      const currentSessionId = completeSignUp?.createdSessionId || activeSignUp?.createdSessionId;
+
+      if (currentStatus === 'complete' || (completeSignUp && !completeSignUp.error)) {
+        if (currentSessionId && clerk.setActive) {
+          await clerk.setActive({ session: currentSessionId });
         }
         try {
           await signInProduction();
@@ -422,7 +630,7 @@ export function LoginScreen() {
           );
         }
       } else {
-        setClerkError(`Registration incomplete (${completeSignUp.status}). Check code and retry.`);
+        setClerkError(`Registration incomplete (${currentStatus || 'verification_pending'}). Check code and retry.`);
       }
     } catch (err: unknown) {
       setClerkError(extractClerkErrorMessage(err));
@@ -457,35 +665,8 @@ export function LoginScreen() {
         </Text>
       </View>
 
-      {/* Main Tab Switcher: Demo Sandbox vs Clerk Production */}
+      {/* Main Tab Switcher: Clerk Production vs Demo Sandbox */}
       <View style={[styles.tabContainer, { backgroundColor: colors.muted }]}>
-        <Pressable
-          style={[
-            styles.tabButton,
-            mainTab === 'demo' && [styles.tabButtonActive, { backgroundColor: colors.card }],
-          ]}
-          onPress={() => {
-            setMainTab('demo');
-            clearError();
-            setClerkError(null);
-          }}
-          testID="tab-demo"
-        >
-          <Feather
-            name="zap"
-            size={14}
-            color={mainTab === 'demo' ? colors.primary : colors.mutedForeground}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: mainTab === 'demo' ? colors.foreground : colors.mutedForeground },
-            ]}
-          >
-            Instant Sandbox
-          </Text>
-        </Pressable>
-
         <Pressable
           style={[
             styles.tabButton,
@@ -510,6 +691,33 @@ export function LoginScreen() {
             ]}
           >
             Clerk Auth
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.tabButton,
+            mainTab === 'demo' && [styles.tabButtonActive, { backgroundColor: colors.card }],
+          ]}
+          onPress={() => {
+            setMainTab('demo');
+            clearError();
+            setClerkError(null);
+          }}
+          testID="tab-demo"
+        >
+          <Feather
+            name="zap"
+            size={14}
+            color={mainTab === 'demo' ? colors.primary : colors.mutedForeground}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              { color: mainTab === 'demo' ? colors.foreground : colors.mutedForeground },
+            ]}
+          >
+            Demo Sandbox
           </Text>
         </Pressable>
       </View>
@@ -817,10 +1025,127 @@ export function LoginScreen() {
             </Pressable>
           </View>
 
+          {/* Quick Hosted Authentication (Clerk Web Portal - Recommended for Expo Go) */}
+          <Card style={[styles.clerkCard, { marginBottom: 10, backgroundColor: colors.secondary }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Feather name="globe" size={16} color={colors.primary} />
+              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.foreground }}>
+                {clerkMode === 'signup' ? 'Hosted Web Portal (Quick Sign Up)' : 'Hosted Web Portal (Quick Sign In)'}
+              </Text>
+            </View>
+            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: colors.mutedForeground, marginBottom: 10, lineHeight: 16 }}>
+              Opens Clerk's browser portal. Recommended for Expo Go — works instantly without requiring Native API dashboard activation.
+            </Text>
+            <Button
+              label={clerkMode === 'signup' ? 'Sign Up via Clerk Web Portal' : 'Sign In via Clerk Web Portal'}
+              icon="external-link"
+              variant="outline"
+              onPress={() => void handleHostedAuth(clerkMode === 'signup' ? 'sign-up' : 'sign-in')}
+              loading={hostedLoading}
+              testID="hosted-auth-button"
+            />
+          </Card>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+            <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: colors.mutedForeground }}>
+              or continue with in-app form
+            </Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          </View>
+
           {/* CLERK MODE 1: SIGN IN */}
           {clerkMode === 'signin' ? (
             <>
-              {activeClerkEmail && !needsVerification ? (
+              {activeClerkEmail && isUnprovisioned ? (
+                <Card style={styles.clerkCard}>
+                  <View style={styles.verificationHeader}>
+                    <View style={[styles.codeIcon, { backgroundColor: colors.infoSurface }]}>
+                      <Feather name="user-check" size={20} color={colors.info} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.clerkTitle, { color: colors.foreground }]}>
+                        Account Provisioning Required
+                      </Text>
+                      <Text style={[styles.clerkDescription, { color: colors.mutedForeground }]}>
+                        Logged in as {activeClerkEmail}
+                      </Text>
+                    </View>
+                  </View>
+                  <InfoBanner
+                    title="Clinical Record Not Linked"
+                    body="Your Clerk account is authenticated, but this user is not yet provisioned in HackMatrix clinical records. In development mode, you can self-provision as a test patient or test clinician below."
+                    tone="info"
+                    icon="shield"
+                  />
+                  <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 4 }]}>
+                    Select role to provision:
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                    <Pressable
+                      style={[
+                        styles.roleTogglePill,
+                        {
+                          borderColor: provisionRole === 'PATIENT' ? colors.primary : colors.border,
+                          backgroundColor: provisionRole === 'PATIENT' ? colors.secondary : 'transparent',
+                        },
+                      ]}
+                      onPress={() => setProvisionRole('PATIENT')}
+                      testID="provision-role-patient"
+                    >
+                      <Feather name="heart" size={15} color={provisionRole === 'PATIENT' ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.roleToggleText, { color: provisionRole === 'PATIENT' ? colors.primary : colors.foreground }]}>
+                        Test Patient
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.roleTogglePill,
+                        {
+                          borderColor: provisionRole === 'CLINICIAN' ? colors.primary : colors.border,
+                          backgroundColor: provisionRole === 'CLINICIAN' ? colors.secondary : 'transparent',
+                        },
+                      ]}
+                      onPress={() => setProvisionRole('CLINICIAN')}
+                      testID="provision-role-clinician"
+                    >
+                      <Feather name="briefcase" size={15} color={provisionRole === 'CLINICIAN' ? colors.primary : colors.mutedForeground} />
+                      <Text style={[styles.roleToggleText, { color: provisionRole === 'CLINICIAN' ? colors.primary : colors.foreground }]}>
+                        Test Clinician
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <Field
+                    label="Full Name"
+                    placeholder={provisionRole === 'PATIENT' ? 'e.g. John Doe' : 'e.g. Dr. Jane Smith'}
+                    value={provisionName}
+                    onChangeText={setProvisionName}
+                    testID="provision-name-input"
+                  />
+                  <Field
+                    label={provisionRole === 'PATIENT' ? 'Medical Note / Condition' : 'Department / Specialty'}
+                    placeholder={provisionRole === 'PATIENT' ? 'e.g. Asthma, Hypertension' : 'e.g. Harbor Health Clinic — Primary Care'}
+                    value={provisionDetail}
+                    onChangeText={setProvisionDetail}
+                    testID="provision-detail-input"
+                  />
+                  <Button
+                    label={`Complete Provisioning & Enter as ${provisionRole === 'PATIENT' ? 'Patient' : 'Clinician'}`}
+                    icon="check"
+                    onPress={() => void handleSelfProvision()}
+                    loading={provisionLoading}
+                    testID="self-provision-button"
+                  />
+                  <Button
+                    label="Sign out / Switch account"
+                    icon="log-out"
+                    variant="outline"
+                    onPress={() => void handleClerkSignOut()}
+                    loading={signOutLoading}
+                    testID="clerk-sign-out-button"
+                  />
+                </Card>
+              ) : activeClerkEmail && !needsVerification ? (
                 <Card style={styles.activeAccountCard}>
                   <View style={styles.activeAccountHeader}>
                     <View style={[styles.codeIcon, { backgroundColor: colors.infoSurface }]}>

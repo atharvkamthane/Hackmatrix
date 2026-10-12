@@ -12,7 +12,7 @@ import { AuditPage } from './pages/AuditPage';
 import { SecurityPage } from './pages/SecurityPage';
 
 const AdminRoutes: React.FC = () => {
-  const { user, isAuthenticated, isSignedIn, isLoading, error, logout, enterDemoMode, isDemo } = useAuth();
+  const { user, isAuthenticated, isSignedIn, isLoading, error, logout, enterDemoMode, enterLocalAdminMode, isDemo } = useAuth();
 
   if (isLoading) {
     return (
@@ -21,13 +21,20 @@ const AdminRoutes: React.FC = () => {
           <div className="inline-flex h-9 w-9 animate-spin items-center justify-center rounded-full border-4 border-slate-200 border-t-cyan-600 mb-2" />
           <h2 className="text-base font-semibold text-slate-800">Checking administrator access...</h2>
           <p className="text-sm text-slate-500">Connecting to authentication service</p>
-          <div className="pt-3 border-t border-slate-100">
+          <div className="pt-3 border-t border-slate-100 flex justify-center gap-4">
+            <button
+              type="button"
+              onClick={enterLocalAdminMode}
+              className="text-xs text-teal-600 hover:text-teal-700 font-medium underline"
+            >
+              Connect Live Admin
+            </button>
             <button
               type="button"
               onClick={enterDemoMode}
-              className="text-xs text-cyan-600 hover:text-cyan-700 font-medium underline"
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium underline"
             >
-              Taking too long? Launch Instant Demo Mode
+              Demo Mode
             </button>
           </div>
         </section>
@@ -44,11 +51,19 @@ const AdminRoutes: React.FC = () => {
             <p className="text-xs text-slate-500 mb-5">Epidemiological surveillance & privacy threshold monitoring</p>
             <button
               type="button"
+              onClick={enterLocalAdminMode}
+              className="w-full rounded-lg bg-gradient-to-r from-teal-600 to-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:from-teal-500 hover:to-cyan-500 transition-all flex items-center justify-center gap-2 mb-2"
+            >
+              <span>🏥</span>
+              <span>Connect Live Admin Console (Local Database)</span>
+            </button>
+            <button
+              type="button"
               onClick={enterDemoMode}
-              className="w-full rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow hover:from-cyan-500 hover:to-blue-500 transition-all flex items-center justify-center gap-2 mb-4"
+              className="w-full rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 text-xs font-medium border border-slate-300 transition-all flex items-center justify-center gap-2 mb-4"
             >
               <span>⚡</span>
-              <span>Launch Instant Demo Mode</span>
+              <span>Launch Instant Demo Mode (Synthetic Mocks)</span>
             </button>
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
@@ -79,10 +94,17 @@ const AdminRoutes: React.FC = () => {
             </button>
             <button
               type="button"
-              className="flex-1 rounded-md bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500"
+              className="flex-1 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500"
+              onClick={enterLocalAdminMode}
+            >
+              Connect Live
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-md bg-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-300"
               onClick={enterDemoMode}
             >
-              Enter Demo Mode
+              Demo Mode
             </button>
           </div>
         </section>

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { Types, type FilterQuery } from "mongoose";
 import type { DatabaseConnections } from "../db";
 import { createAnalyticsModels, surveillanceCategories, type SurveillanceAggregate } from "../models/analytics";
+import { etlStatusTracker } from "../etl/status";
 import { logger } from "../lib/logger";
 
 const K_THRESHOLD = 10;
@@ -48,13 +49,14 @@ interface StoredAuditEvent {
 }
 
 export function aggregateCount(rows: readonly Pick<AggregateRow, "caseCount">[]): AggregateValue {
-  if (rows.length === 0) return { suppressed: true, reason: "NO_DATA" };
-  if (rows.some((row) => row.caseCount < K_THRESHOLD)) {
+  const activeRows = rows.filter((row) => row.caseCount > 0);
+  if (activeRows.length === 0) return { suppressed: true, reason: "NO_DATA" };
+  if (activeRows.some((row) => row.caseCount < K_THRESHOLD)) {
     return { suppressed: true, reason: "BELOW_K_THRESHOLD" };
   }
   return {
     suppressed: false,
-    count: rows.reduce((sum, row) => sum + row.caseCount, 0),
+    count: activeRows.reduce((sum, row) => sum + row.caseCount, 0),
   };
 }
 
@@ -417,6 +419,21 @@ export function createAdminAnalyticsRouter(
           safeReference: /^[a-zA-Z0-9_-]{1,80}$/.test(event.correlationId ?? "") ? event.correlationId : `sec_${event._id.toString().slice(-8)}`,
           summary: "A request was rejected or failed; patient and resource details are withheld.",
         })),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/etl-status", async (_req, res, next) => {
+    try {
+      const snapshot = etlStatusTracker.getSnapshot();
+      const checkpoint = await analyticsConnection.collection("etlCheckpoints").findOne({ streamName: "conditions" });
+      const ledgerCount = await analyticsConnection.collection("etlLedgers").countDocuments({ status: "ACTIVE" });
+      res.json({
+        ...snapshot,
+        totalActiveLedgerRecords: ledgerCount,
+        checkpointTimestamp: checkpoint?.lastCheckpointedAt ? new Date(checkpoint.lastCheckpointedAt).toISOString() : null,
       });
     } catch (error) {
       next(error);

@@ -161,6 +161,10 @@ export function PatientHomeScreen() {
   useFocusEffect(useCallback(() => {
     void load();
     void refresh();
+    const interval = setInterval(() => {
+      void refresh();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [load, refresh]));
 
   const pendingCount = data?.requests.filter((request) => request.status === 'pending').length ?? 0;
@@ -378,6 +382,16 @@ export function PatientQrScreen() {
             {expired ? 'This QR has expired' : `Refreshes in ${token ? timeLeft(token.expiresAt, now) : '—'}`}
           </Text>
         </View>
+        {token && !expired ? (
+          <View style={{ marginTop: 8, padding: 8, backgroundColor: colors.secondary, borderRadius: 8, alignItems: 'center' }}>
+            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 10, color: colors.mutedForeground }}>
+              Token Payload (for emulator/browser manual entry):
+            </Text>
+            <Text selectable style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, color: colors.foreground, marginTop: 2 }}>
+              {token.payload}
+            </Text>
+          </View>
+        ) : null}
         {expired ? <Button label="Create a new QR" icon="refresh-cw" onPress={() => void load()} /> : null}
         <Text style={[styles.qrFootnote, { color: colors.mutedForeground }]}>
           Only scan this with a clinician who is with you. Scanning creates a request; your records stay private until you approve it.
@@ -385,7 +399,7 @@ export function PatientQrScreen() {
       </Card>
       <View style={[styles.tokenStatus, { backgroundColor: colors.secondary }]}>
         <Feather name="lock" size={14} color={colors.primary} />
-        <Text style={[styles.tokenStatusText, { color: colors.secondaryForeground }]}>The token expires after 10 minutes</Text>
+        <Text style={[styles.tokenStatusText, { color: colors.secondaryForeground }]}>The token expires after 60 seconds</Text>
       </View>
     </Screen>
   );
@@ -406,7 +420,11 @@ export function PatientAccessScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
-  useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    const interval = setInterval(() => void refresh(), 2500);
+    return () => clearInterval(interval);
+  }, [refresh]));
 
   const requests = data?.requests ?? [];
   const grants = data?.grants ?? [];

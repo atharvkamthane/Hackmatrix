@@ -645,5 +645,57 @@ export function createClinicalRouter(
     }
   });
 
+  router.get("/clinician/me", auth, async (req, res, next) => {
+    try {
+      if (req.auth?.role !== "CLINICIAN") return responseError(res, 403, "FORBIDDEN", "Clinician access is required.");
+      const user = await findUser(req, "CLINICIAN");
+      const clinician = user && await findClinicianForUser(user);
+      if (!user || !clinician) return responseError(res, 404, "CLINICIAN_NOT_FOUND", "Clinician profile is not provisioned.");
+      const organization = await organizationName(user.organizationId);
+      await writeAudit(req, user, "CLINICIAN_PROFILE_READ", "Clinician", clinician._id.toString());
+      return res.json({
+        id: clinician._id.toString(),
+        name: clinician.displayName,
+        professionalId: clinician.professionalId,
+        organization,
+        role: "CLINICIAN",
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post("/clinician/conditions", auth, async (req, res, next) => {
+    try {
+      const access = await authorizedWrite(req, res, "visits");
+      if (!access) return;
+      const code = requiredText(req.body, "code", 100) || "RESP_COVID19";
+      const display = requiredText(req.body, "display", 200);
+      const onsetDate = toDate(req.body?.date) || new Date();
+      if (!display) {
+        return responseError(res, 400, "INVALID_CONDITION", "Condition display name is required.");
+      }
+      const record = await models.Condition.create({
+        patientId: access.patient._id,
+        organizationId: access.user.organizationId,
+        recordedByClinicianId: access.clinician._id,
+        code,
+        display,
+        clinicalStatus: "active",
+        onsetDate,
+      });
+      await writeAudit(req, access.user, "CLINICAL_CONDITION_CREATED", "Patient", access.patient._id.toString());
+      return res.status(201).json({
+        id: record._id.toString(),
+        name: record.display,
+        code: record.code,
+        status: "Active",
+        since: String(onsetDate.getUTCFullYear()),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }

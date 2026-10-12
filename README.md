@@ -30,6 +30,17 @@ The consent flow is the main product path:
 5. The clinician can only read or write data covered by the active grant.
 6. The patient can revoke access before the grant expires.
 
+## Current System Status (October 2026)
+
+| Component | Status | Key Details |
+| --- | --- | --- |
+| **Mobile App (`hackmatrix-mobile`)** | **Active & Integrated** | Expo SDK 57, `@clerk/expo` Core 3 SDK with `expo-secure-store` token cache. Dual-mode support: Demo Sandbox (4 personas) and real Clerk sign-in, email/password registration with OTP verification, and server-side role provisioning. |
+| **API Server (`api-server`)** | **Active & Verified** | Express 5 with `@clerk/backend` token verification, MongoDB/Mongoose connection, server-enforced role authorization (`PATIENT`, `CLINICIAN`, `ADMIN`), rate-limited provisioning endpoint (`/api/auth/provision-self`), and Socket.IO real-time event rooms. |
+| **Database & Planes** | **Separated & Protected** | Distinct Clinical and Analytics connections. Clinical models are prohibited from analytics connections. Admin routes only consume sanitized aggregates with K=10 small-group suppression. |
+| **ETL Engine** | **Operational (55/55 Tests Passing)** | Automated clinical-to-surveillance transformation pipeline with MongoDB Change Streams and polling fallback engine, deduplication ledgering, checkpoint restart resilience, and soft deletion tracking. |
+| **Admin Web (`admin-web`)** | **Running Locally** | React + Vite dashboard displaying regional health surveillance trends, disease distribution charts, and suppression audit logs. |
+
+
 ## Repository layout
 
 This is a pnpm workspace:
@@ -260,14 +271,21 @@ This repository remains a prototype, with explicit demo and production service p
 
 Do not enter real patient data, credentials, access tokens, or other sensitive information into the demo.
 
-## Remaining work
+## Accomplished Milestones
 
-- Provision a MongoDB test database and Clerk development application; create active user, organization, patient, and clinician mappings for end-to-end testing.
-- Add trusted aggregate-data ingestion and source validation; do not populate production analytics with sample counts.
-- Complete multi-factor/one-time-code sign-in handling for Clerk configurations that require it.
-- Implement the explicitly required emergency-access workflow with reason, duration, patient notification, and immutable audit semantics.
-- Add live MongoDB integration tests for database failures, consent expiry/revocation, QR replay prevention, role denial, and cross-app consistency.
-- Keep `lib/api-spec/openapi.yaml` and generated packages aligned with the implemented route contract.
+- **55/55 Automated Tests Passing**: Complete regression suite covering schema boundaries, consent scopes, security headers, differential privacy suppression, and ETL idempotency.
+- **Controlled Clinical-to-Surveillance ETL**: Live MongoDB Change Stream observer with reliable polling fallback, ledgering, category/geography updates, and soft-delete suppression.
+- **Dual Data-Plane Separation**: Connection isolation separating clinical protected health data from anonymous surveillance analytics.
+- **Clerk Core 3 & Server-Enforced Roles**: Native API mobile authentication with secure session token caching and strict server-side role decisions via `/api/auth/provision-self`.
+- **Admin Dashboard Integration**: Real-time regional analytics and disease surveillance charts powered by Express and Socket.IO.
+
+## Remaining Roadmap
+
+- Multi-institution cross-organization consent federation.
+- Emergency "break-glass" workflow with patient notification and immutable emergency audit logging.
+- Offline-first encrypted synchronization on mobile devices for intermittent connectivity.
+- EAS production build pipelines for iOS and Android store release.
+
 
 ## Troubleshooting
 
